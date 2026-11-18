@@ -132,6 +132,14 @@ node scripts/screenshot-site.cjs --only home-workflow --port 4181 --out artifact
 
 > 发版时请让 tag（如 `v0.3.0`）与 `package.json` 的 `version` 一致，这样版本号注入、release.json 与下载页展示才是同一个版本。
 
+## 下载按钮行为
+
+- **首页主下载按钮**在 Windows / Linux 上直接指向最新 Release 的安装包文件（`releases/download/...`，GitHub 返回附件，
+  浏览器直接开始下载，不会进入 Release 页面）；macOS 因为有 arm64 / x64 两种架构，会跳到下载页让用户选择。
+- **下载页平台卡片**直接列出每个安装包的下载直链（带 `download` 属性、显示文件名与体积），不再提供
+  「前往 GitHub Releases」的兜底按钮；拿不到资产时显示禁用占位而不是跳转 GitHub。
+- 只有「发布记录 / 查看全部发布」这类文字链接会打开 GitHub Release 页面，它们不承载下载动作。
+
 ## 第一次开启 GitHub Pages
 
 Pages 由 `pages.yml` 负责，仓库管理员需要手动开启一次：
