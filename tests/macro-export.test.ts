@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { planPerformance } from '../src/core/instrument/plan';
-import { generateMacroExport, getNoteTriggerRows, getTriggerKeyMapRows } from '../src/core/export/macro';
+import {
+  generateMacroExport,
+  getNoteTriggerRows,
+  getTriggerKeyMapRows,
+  MACRO_SOFTWARE_ROWS,
+  MACRO_SUPPORT_LABEL,
+} from '../src/core/export/macro';
 import { buildScoreFromText } from '../src/core/score/dsl';
 
 /** 低八度旋律：会用到鼠标左键修饰，便于验证鼠标事件导出 */
@@ -111,8 +117,62 @@ describe('AutoHotkey 宏导出', () => {
   });
 });
 
-describe('罗技 G HUB Lua 宏导出', () => {
-  it('包含 OnEvent/触发按钮/PressKey/鼠标映射，且可解析结构', () => {
+describe('AutoHotkey v2 宏导出', () => {
+  it('生成 v2 语法且事件数与计划一致，不混入 v1 语法', () => {
+    const score = makeLowScore();
+    const plan = planPerformance(score, { transpose: 0 });
+    const result = generateMacroExport(plan, 'ahk2', { title: '宏测试曲' });
+    expect(result.extension).toBe('ahk');
+    expect(result.filterName).toContain('v2');
+    expect(result.text).toContain('#Requires AutoHotkey v2.0');
+    expect(result.text).toContain('Hotkey triggerHotkey, StartMacro');
+    expect(result.text).toContain('StartMacro(*) {');
+    expect(result.text).toContain('SendInput "{sc02C down}"'); // Z
+    expect(result.text).toContain('SendInput "{LButton down}"'); // 降八度修饰
+    expect(result.text).not.toContain('#NoEnv');
+    expect(result.text).not.toContain('Hotkey, %');
+    expect(result.text).not.toContain('global triggerHotkey');
+    const sent = result.text.split('\r\n').filter((line) => line.startsWith('  SendInput "'));
+    expect(sent).toHaveLength(plan.events.length);
+    expect(result.text).not.toContain('undefined');
+    expect(result.text).not.toContain('NaN');
+  });
+
+  it('支持自定义触发键，空谱也保持合法结构', () => {
+    const parsed = buildScoreFromText('# 标题：空\n0- - - -|\n');
+    const plan = planPerformance(parsed.score);
+    const result = generateMacroExport(plan, 'ahk2', { ahkTrigger: 'XButton2' });
+    expect(result.text).toContain('triggerHotkey := "XButton2"');
+    expect(result.text).toContain('PlayMacro() {');
+    expect(result.text).not.toContain('Wait(NaN)');
+    expect(result.text).not.toContain('SendInput "undefined"');
+  });
+});
+
+describe('宏软件兼容性对照表', () => {
+  it('罗技走原生脚本，其他品牌只能录制、用 AHK 或 CSV 兜底', () => {
+    expect(MACRO_SOFTWARE_ROWS.length).toBeGreaterThanOrEqual(5);
+    expect(MACRO_SOFTWARE_ROWS[0].software).toContain('罗技');
+    expect(MACRO_SOFTWARE_ROWS[0].support).toBe('native');
+    expect(MACRO_SOFTWARE_ROWS.some((row) => row.support === 'universal' && row.brand === '任意品牌')).toBe(true);
+    expect(MACRO_SOFTWARE_ROWS.some((row) => row.support === 'record-only')).toBe(true);
+    for (const row of MACRO_SOFTWARE_ROWS) {
+      expect(row.format.length).toBeGreaterThan(0);
+      expect(row.note.length).toBeGreaterThan(0);
+      expect(MACRO_SUPPORT_LABEL[row.support].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('触发键位表带兼容性章节', () => {
+    const plan = planPerformance(makeLowScore(), { transpose: 0 });
+    const result = generateMacroExport(plan, 'trigger-table', { title: '宏测试曲' });
+    expect(result.text).toContain('## 5. 宏软件兼容性');
+    expect(result.text).toContain('仅录制');
+    expect(result.text).toContain('AutoHotkey v2');
+  });
+});
+
+describe('罗技 G HUB Lua 宏导出', () => {  it('包含 OnEvent/触发按钮/PressKey/鼠标映射，且可解析结构', () => {
     const score = makeLowScore();
     const plan = planPerformance(score, { transpose: 0 });
     const result = generateMacroExport(plan, 'lua', { title: '宏测试曲' });

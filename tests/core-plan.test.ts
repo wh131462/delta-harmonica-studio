@@ -24,6 +24,7 @@ import {
   toTimedNotes,
 } from '../src/core/music/timeline';
 import {
+  auditionStartMs,
   evaluateTranspositions,
   modifierDiff,
   planPerformance,
@@ -464,6 +465,38 @@ describe('plan.planPerformance 空乐谱与连音', () => {
     expect(plan.notes[0].startMs).toBe(90);
     expect(plan.notes[0].endMs).toBe(1078);
     expect(validatePlan(plan)).toEqual([]);
+  });
+});
+
+describe('plan.auditionStartMs 试听定位', () => {
+  it('从指定拍位的音符起点开始，拍位落在休止符时顺延到下一个音', () => {
+    const plan = planPerformance(makeScale(0, 120));
+    expect(plan.notes).toHaveLength(7);
+    expect(auditionStartMs(plan, 0)).toBe(plan.notes[0].startMs);
+    expect(auditionStartMs(plan, 2)).toBe(plan.notes[2].startMs);
+    // 0.5 拍落在第一个音内部：仍然从该音的起点开始
+    expect(auditionStartMs(plan, 0.5)).toBe(plan.notes[0].startMs);
+    // 6.5 拍落在最后一个音内部
+    expect(auditionStartMs(plan, 6.5)).toBe(plan.notes[6].startMs);
+  });
+
+  it('休止符之后没有可演奏音符或计划为空时返回 -1', () => {
+    const score = makeScore([
+      { degree: 1, startBeat: 0, duration: 1 },
+      { degree: 0, startBeat: 1, duration: 2 },
+    ], { tempo: 120 });
+    const plan = planPerformance(score);
+    expect(auditionStartMs(plan, 1)).toBe(-1);
+    expect(auditionStartMs(plan, 3)).toBe(-1);
+    expect(auditionStartMs(planPerformance(createEmptyScore()), 0)).toBe(-1);
+    expect(auditionStartMs(plan, Number.NaN)).toBe(-1);
+  });
+
+  it('连音被合并成长音时，从后半段开始也从该长音的起点播放', () => {
+    const { score } = buildScoreFromText('5~ 5');
+    const plan = planPerformance(score, { tempoOverride: 120 });
+    expect(plan.notes).toHaveLength(1);
+    expect(auditionStartMs(plan, 1)).toBe(plan.notes[0].startMs);
   });
 });
 
