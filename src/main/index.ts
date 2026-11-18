@@ -111,6 +111,20 @@ function createWindow(): BrowserWindow {
       setTimeout(async () => {
         debugLog('capturing screenshot...');
         try {
+          const clickSelector = process.env.DFH_CLICK_SELECTOR;
+          if (clickSelector) {
+            const clicked = await win.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(clickSelector)}); if (el) { el.click(); return true; } return false; })()`,
+            );
+            debugLog(`screenshot click selector=${clickSelector} clicked=${String(clicked)}`);
+            await new Promise((resolve) => setTimeout(resolve, 450));
+          }
+          const evalJs = process.env.DFH_EVAL_JS;
+          if (evalJs) {
+            const result = await win.webContents.executeJavaScript(evalJs);
+            debugLog(`screenshot eval js result=${String(result)}`);
+            await new Promise((resolve) => setTimeout(resolve, 450));
+          }
           const image = await win.webContents.capturePage();
           await fs.writeFile(screenshotPath, image.toPNG());
           debugLog(`screenshot saved: ${screenshotPath}`);

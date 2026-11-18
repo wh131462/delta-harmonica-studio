@@ -25,7 +25,7 @@ import { Icon } from '@renderer/components/Icon';
 import { EmptyState, PageHeader } from '@renderer/components/PageHeader';
 import { useAppStore } from '@renderer/state/app-store';
 import { beatsToMs, formatDateTime, formatDurationMs, keyLabel, sourceKindLabel } from '@renderer/utils/format';
-import type { LibraryEntry } from '@shared/types';
+import type { ExportFormat, LibraryEntry } from '@shared/types';
 import '../styles/library.css';
 
 type FilterKind = 'all' | 'favorite' | 'game' | 'imported' | 'manual';
@@ -249,8 +249,8 @@ export function LibraryPage(): JSX.Element {
     }
   };
 
-  /** 导出：键位谱 / 简谱文本 / 方案 JSON */
-  const exportScore = async (id: string, format: 'keys' | 'dsl' | 'json') => {
+  /** 导出：键位谱 / 简谱文本 / 方案 JSON / 鼠标宏 / 触发键位表 */
+  const exportScore = async (id: string, format: ExportFormat) => {
     try {
       const score = await window.api.library.load(id);
       const path = await window.api.library.exportScore(score, format);
@@ -433,6 +433,19 @@ export function LibraryPage(): JSX.Element {
         </button>
         <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'json'))}>
           <Icon name="download" size={13} /> 导出方案 JSON
+        </button>
+        <span className="lb-menu-sep" role="separator" />
+        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-ahk'))}>
+          <Icon name="download" size={13} /> 导出 AutoHotkey 宏
+        </button>
+        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-lua'))}>
+          <Icon name="download" size={13} /> 导出罗技 G HUB Lua 宏
+        </button>
+        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-csv'))}>
+          <Icon name="download" size={13} /> 导出宏时序表 CSV
+        </button>
+        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'trigger-table'))}>
+          <Icon name="download" size={13} /> 导出触发键位表
         </button>
         <span className="lb-menu-sep" role="separator" />
         <button type="button" role="menuitem" className="danger" onClick={(event) => handleMenuAction(event, () => void remove(entry))}>

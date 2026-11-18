@@ -396,3 +396,52 @@ interface ScoreMeta {
 4. 热键被系统/游戏占用时需用户改绑（设置页已提示）；
 5. 方案库「游戏任务曲」仍用标题关键词近似，后续加 tag 字段。
 
+---
+
+## 17. v0.3 鼠标宏导出与触发键位表
+
+### 17.1 目标
+
+在「软件内直接注入」之外，提供第二条可用路径：把同一份演奏计划导出为**鼠标宏软件可回放的脚本**，并给出**按曲谱编排的触发键位表**（每个音按哪个音键 + 哪个鼠标修饰键、何时按、按多久）。适用于不想常驻运行本软件、或只用鼠标宏驱动的用户。
+
+### 17.2 设计原则
+
+- **同源**：导出直接消费 `PlaybackPlan.events`（键盘事件带物理扫描码/虚拟键码，鼠标事件带按钮），与 `PlaybackController` 注入的事件流完全一致；移调、折返、修饰键 DP 切换都已在此前算好。
+- **零依赖**：脚本生成是纯字符串拼接，位于 `src/core/export/macro.ts`，可单测。
+- **可配置触发**：AHK 触发键（默认 F9，或 `XButton1/XButton2` 鼠标侧键）；罗技 OnEvent 触发按钮（默认 5=前进侧键，可改 4）。
+- **安全可中止**：AHK 用 `playing` 标志 + `Wait()` 轮询，F10 `Reload` 立即中止；罗技 Lua 再按一次侧键置 `playing=false`，`Wait()` 在 10ms 内退出。
+
+### 17.3 四种导出格式
+
+| 格式 | 实现要点 |
+|---|---|
+| AutoHotkey v1 `.ahk` | 键盘统一用扫描码 `{sc02C down/up}`（布局无关，与软件内注入一致）；鼠标用 `{LButton/MButton/RButton down/up}`；事件间隔生成 `Wait(ms)`；开头写好管理员运行、无边框窗口、急停说明 |
+| 罗技 G HUB Lua `.lua` | `OnEvent` 监听 `MOUSE_BUTTON_PRESSED` 侧键触发；`PressKey("z")`…、`comma` 为逗号键名；鼠标编号 `1=左 2=中 3=右`（已按 Logitech Lua 文档核对）；`GetRunningTime()` + `Sleep(10)` 实现可中断延时 |
+| 通用 CSV `.csv` | UTF-8 BOM；列：序号/时间ms/距上一事件ms/动作/设备/键位/扫描码/说明；每行可直接录入支持"按键+延时"的宏编辑器 |
+| 触发键位表 `.trigger.md` | ① 全音域 C3–C#6 共 38 个半音的最佳触发映射（音名/MIDI/简谱级数/八度偏移/键位记号/音键/鼠标修饰）；② 本曲逐音触发表（整数 ms 开始/保持/结束、音名、触发方式）；③ 组合使用统计；④ 输入事件统计；⑤ 计划 warnings |
+
+### 17.4 集成与 UI
+
+- `ExportFormat` 扩展：`macro-ahk / macro-lua / macro-csv / trigger-table`，主进程 `library:export` 统一生成并落盘；
+- 方案库「更多操作」增加四项导出；
+- 演奏台新增「鼠标宏」Tab：触发键/触发按钮选择、四种格式导出与复制、AHK/Lua/CSV/触发表预览（截断 180 行）、全音域 38 键表、本曲逐音表（可加载更多）；
+- 样式按 UI 规范放页面级 `styles/play-macro.css`，只用 `:root` 令牌，琥珀色仅用于当前预览格式；本面板无主操作按钮（唯一主操作仍是底部「开始演奏」）；
+- 截图/验收钩子：主进程支持 `DFH_CLICK_SELECTOR` / `DFH_EVAL_JS`，便于自动切 Tab、滚动面板后截图。
+
+### 17.5 验收
+
+- `tests/macro-export.test.ts`：9 项（AHK 扫描码/鼠标修饰/触发键/空谱、Lua 结构/鼠标编号/自定义触发、CSV BOM/行数/时间单调、触发表 38 音映射/逐音表/统计）；
+- 全量 `npm test`：**204 passed / 1 skipped**；`npm run typecheck`、`npm run build` 全绿；
+- 截图：`docs/screenshots/ui-macro.png`、`ui-macro-table.png`；方案库菜单已含四项新导出；
+- 打包 v0.3.0：安装包 + 便携版。
+
+### 17.6 已知限制
+
+1. 宏软件 Sleep 分辨率有限（AHK/G HUB 通常 10–15ms），极快节奏可能有轻微时序抖动；
+2. AHK/G HUB 必须以管理员运行，否则游戏静默丢弃输入；
+3. 若本软件同时运行，F9 全局热键与 AHK 默认 F9 会冲突——建议宏触发改用鼠标侧键，或先退出软件；
+4. 宏软件同样属于第三方模拟输入，合规风险与软件内注入一致；
+5. 罗技旧版 Gaming Software 与新 G HUB 的 API 基本兼容，但按键编号/界面路径可能有差异，导出文件内已注释映射；
+6. 其他品牌宏软件不保证支持 Lua/AHK，可优先用 CSV 时序表逐行录入。
+
+

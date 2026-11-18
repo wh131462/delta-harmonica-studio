@@ -163,7 +163,16 @@ export interface SaveFileRequest {
   data: string | Uint8Array;
 }
 
-export type ExportFormat = 'json' | 'dsl' | 'midi' | 'keys' | 'txt';
+export type ExportFormat =
+  | 'json'
+  | 'dsl'
+  | 'midi'
+  | 'keys'
+  | 'txt'
+  | 'macro-ahk'
+  | 'macro-lua'
+  | 'macro-csv'
+  | 'trigger-table';
 
 export interface PlaybackRequest {
   events: InputEvent[];

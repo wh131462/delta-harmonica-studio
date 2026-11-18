@@ -6,6 +6,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { serializeScore } from '@core/score/dsl';
 import { generateKeySheet } from '@core/export/keysheet';
+import { generateMacroExport, type MacroFormat } from '@core/export/macro';
+import { planPerformance } from '@core/instrument/plan';
 import type { Score } from '@core/model/score';
 import type {
   AppInfo,
@@ -232,10 +234,45 @@ export function registerIpcHandlers(context: IpcContext): void {
 
   ipcMain.handle('library:export', async (_event, score: Score, format: ExportFormat): Promise<string | null> => {
     const baseName = safeFileName(score?.meta?.title ?? '未命名');
+    const buildMacro = (macroFormat: MacroFormat) => {
+      const plan = planPerformance(score);
+      return generateMacroExport(plan, macroFormat, {
+        title: score.meta.title,
+        ...(score.meta.artist ? { artist: score.meta.artist } : {}),
+      });
+    };
     let content: string;
     let extension: string;
     let filterName: string;
     switch (format) {
+      case 'macro-ahk': {
+        const macro = buildMacro('ahk');
+        content = macro.text;
+        extension = macro.extension;
+        filterName = macro.filterName;
+        break;
+      }
+      case 'macro-lua': {
+        const macro = buildMacro('lua');
+        content = macro.text;
+        extension = macro.extension;
+        filterName = macro.filterName;
+        break;
+      }
+      case 'macro-csv': {
+        const macro = buildMacro('csv');
+        content = macro.text;
+        extension = macro.extension;
+        filterName = macro.filterName;
+        break;
+      }
+      case 'trigger-table': {
+        const macro = buildMacro('trigger-table');
+        content = macro.text;
+        extension = macro.extension;
+        filterName = macro.filterName;
+        break;
+      }
       case 'json':
         content = JSON.stringify(score, null, 2);
         extension = 'dfh.json';

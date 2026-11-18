@@ -1,0 +1,118 @@
+/* ============================================================
+   演奏台 · 鼠标宏 / 触发键位表（页面级样式）
+   规范：颜色/圆角/阴影只用 :root 令牌；琥珀色只用于「当前选中」；
+   本面板所有导出按钮均为 secondary/quiet，全应用唯一主操作仍是底部播放条「开始演奏」。
+   ============================================================ */
+
+.macro-panel {
+  gap: 10px;
+}
+
+.macro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 预览格式切换：仅当前项使用琥珀强调，符合「强调色预算」 */
+.macro-preview-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+}
+
+.macro-preview-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.macro-preview-tab:hover {
+  color: var(--text);
+}
+
+.macro-preview-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.macro-preview-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* 代码预览：数据展示区，不是嵌套卡片 */
+.macro-preview {
+  flex: 0 0 auto;
+  height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 10.5px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.macro-section-title {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+/* 触发表：可滚动数据网格 */
+.macro-table-wrap {
+  flex: 0 0 auto;
+  height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.macro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+
+.macro-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  color: var(--text-faint);
+  text-align: left;
+  padding: 5px 8px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.macro-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.macro-table tr:hover td {
+  background: var(--panel-hover);
+}
+
+.macro-table code {
+  font-family: var(--mono);
+  color: var(--accent-strong);
+}

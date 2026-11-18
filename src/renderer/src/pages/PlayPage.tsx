@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
 import { generateKeySheet } from '@core/export/keysheet';
+import {
+  generateMacroExport,
+  getNoteTriggerRows,
+  getTriggerKeyMapRows,
+  type MacroExportResult,
+  type MacroFormat,
+} from '@core/export/macro';
 import { ScoreView } from '@renderer/components/score';
 import { Icon } from '@renderer/components/Icon';
 import { PageHeader, EmptyState, Chip } from '@renderer/components/PageHeader';
@@ -7,10 +14,18 @@ import { useAppStore } from '@renderer/state/app-store';
 import { usePreview } from '@renderer/audio/preview-context';
 import { usePerformance, type TransposeValue } from '@renderer/performance/performance-context';
 import { formatDurationMs, keyLabel, sourceKindLabel } from '@renderer/utils/format';
+import '../styles/play-macro.css';
 
-type PanelTab = 'settings' | 'plan' | 'keysheet';
+type PanelTab = 'settings' | 'plan' | 'keysheet' | 'macro';
 
 const TRANSPOSE_CHOICES: TransposeValue[] = [0, 'auto', 1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
+
+const MACRO_PREVIEW_TABS: Array<{ id: MacroFormat; label: string }> = [
+  { id: 'ahk', label: 'AutoHotkey' },
+  { id: 'lua', label: '罗技 Lua' },
+  { id: 'csv', label: 'CSV 时序' },
+  { id: 'trigger-table', label: '触发键位表' },
+];
 
 export function PlayPage(): JSX.Element {
   const app = useAppStore();
@@ -18,6 +33,10 @@ export function PlayPage(): JSX.Element {
   const preview = usePreview();
   const score = app.currentScore;
   const [tab, setTab] = useState<PanelTab>('settings');
+  const [ahkTrigger, setAhkTrigger] = useState<'F9' | 'XButton1' | 'XButton2'>('F9');
+  const [luaTriggerButton, setLuaTriggerButton] = useState<4 | 5>(5);
+  const [macroPreviewKind, setMacroPreviewKind] = useState<MacroFormat>('ahk');
+  const [noteLimit, setNoteLimit] = useState(200);
   const plan = perf.plan;
   const playback = perf.playbackStatus;
   const active = playback.state === 'playing' || playback.state === 'countdown';
@@ -30,6 +49,63 @@ export function PlayPage(): JSX.Element {
       return null;
     }
   }, [score, perf.transpose]);
+
+  /** 宏导出与触发键位表：与当前演奏计划（含移调/速度）完全一致 */
+  const macroExports = useMemo<Record<MacroFormat, MacroExportResult> | null>(() => {
+    if (!plan || !score) return null;
+    const options = {
+      title: score.meta.title,
+      ...(score.meta.artist ? { artist: score.meta.artist } : {}),
+      ahkTrigger,
+      logitechTriggerButton: luaTriggerButton,
+    };
+    try {
+      return {
+        ahk: generateMacroExport(plan, 'ahk', options),
+        lua: generateMacroExport(plan, 'lua', options),
+        csv: generateMacroExport(plan, 'csv', options),
+        'trigger-table': generateMacroExport(plan, 'trigger-table', options),
+      };
+    } catch {
+      return null;
+    }
+  }, [plan, score, ahkTrigger, luaTriggerButton]);
+  const keyMapRows = useMemo(() => getTriggerKeyMapRows(), []);
+  const noteTriggerRows = useMemo(() => (plan ? getNoteTriggerRows(plan, noteLimit) : []), [plan, noteLimit]);
+  const macroPreview = useMemo(() => {
+    if (!macroExports) return '';
+    const lines = macroExports[macroPreviewKind].text.split(/\r?\n/);
+    if (lines.length <= 180) return macroExports[macroPreviewKind].text;
+    return `${lines.slice(0, 180).join('\n')}\n…（预览已截断，导出可查看完整内容）`;
+  }, [macroExports, macroPreviewKind]);
+
+  const sanitizeFileName = (name: string) => name.replace(/[\\/:*?"<>|]/g, '_').trim() || '未命名';
+
+  const exportMacro = async (format: MacroFormat) => {
+    if (!macroExports || !score) return;
+    const result = macroExports[format];
+    const extension = result.extension.includes('.') ? result.extension.split('.').pop() ?? 'txt' : result.extension;
+    try {
+      const path = await window.api.files.save({
+        suggestedName: `${sanitizeFileName(score.meta.title)}.${result.extension}`,
+        filters: [{ name: result.filterName, extensions: [extension] }],
+        data: result.text,
+      });
+      if (path) app.showToast('success', `${result.filterName}已导出：${path}`);
+    } catch (error) {
+      app.showToast('error', `导出失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const copyMacroText = async (format: MacroFormat) => {
+    if (!macroExports) return;
+    try {
+      await navigator.clipboard.writeText(macroExports[format].text);
+      app.showToast('success', '已复制到剪贴板');
+    } catch {
+      app.showToast('error', '复制失败，请手动选择文本复制');
+    }
+  };
 
   const updateTargetWindow = (handle: number) => {
     const info = app.windows.find((item) => item.handle === handle);
@@ -133,6 +209,9 @@ export function PlayPage(): JSX.Element {
                 <button type="button" className="button ghost small" onClick={() => void exportKeys()}>
                   <Icon name="download" size={15} /> 导出键位谱
                 </button>
+                <button type="button" className="button ghost small" onClick={() => setTab('macro')} title="导出鼠标宏脚本与触发键位表">
+                  <Icon name="download" size={15} /> 鼠标宏
+                </button>
               </div>
             </div>
             <div className="score-paper">
@@ -143,7 +222,7 @@ export function PlayPage(): JSX.Element {
                 <Icon name="clock" size={20} />
                 <div>
                   <strong>{playback.countdown ?? app.settings.input.countdownSeconds} 秒后开始演奏</strong>
-                  <span>请切回游戏并取出口琴；F12 / 急停可随时中止</span>
+                  <span>请切回游戏并取出口琴；F10 / 急停可随时中止</span>
                 </div>
               </div>
             ) : null}
@@ -172,6 +251,9 @@ export function PlayPage(): JSX.Element {
               </button>
               <button type="button" className={`panel-tab ${tab === 'keysheet' ? 'active' : ''}`} onClick={() => setTab('keysheet')}>
                 <Icon name="headphones" size={15} /> 键位谱
+              </button>
+              <button type="button" className={`panel-tab ${tab === 'macro' ? 'active' : ''}`} onClick={() => setTab('macro')}>
+                <Icon name="download" size={15} /> 鼠标宏
               </button>
             </div>
 
@@ -383,6 +465,143 @@ export function PlayPage(): JSX.Element {
                 ) : (
                   <p className="muted">暂无键位谱</p>
                 )}
+              </div>
+            ) : null}
+
+            {tab === 'macro' ? (
+              <div className="panel-body macro-panel">
+                <div className="field-row">
+                  <label className="field">
+                    <span className="field-label">AHK 触发键</span>
+                    <select className="select" value={ahkTrigger} onChange={(event) => setAhkTrigger(event.target.value as 'F9' | 'XButton1' | 'XButton2')}>
+                      <option value="F9">F9（键盘，默认）</option>
+                      <option value="XButton1">鼠标侧键 XButton1（后退）</option>
+                      <option value="XButton2">鼠标侧键 XButton2（前进）</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span className="field-label">罗技触发按钮</span>
+                    <select className="select" value={luaTriggerButton} onChange={(event) => setLuaTriggerButton(Number(event.target.value) as 4 | 5)}>
+                      <option value={5}>前进侧键（OnEvent arg=5，默认）</option>
+                      <option value={4}>后退侧键（OnEvent arg=4）</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="macro-actions">
+                  <button type="button" className="button small" disabled={!macroExports} onClick={() => void exportMacro('ahk')}>
+                    <Icon name="download" size={14} /> AHK 宏脚本
+                  </button>
+                  <button type="button" className="button ghost small" disabled={!macroExports} onClick={() => void exportMacro('lua')}>
+                    <Icon name="download" size={14} /> 罗技 G HUB Lua
+                  </button>
+                  <button type="button" className="button ghost small" disabled={!macroExports} onClick={() => void exportMacro('csv')}>
+                    <Icon name="download" size={14} /> CSV 时序表
+                  </button>
+                  <button type="button" className="button ghost small" disabled={!macroExports} onClick={() => void exportMacro('trigger-table')}>
+                    <Icon name="download" size={14} /> 触发键位表
+                  </button>
+                </div>
+
+                <p className="hint-text">
+                  宏脚本与软件内演奏共用同一份时间轴（含当前移调和速度）。AHK / 罗技 G HUB 请以管理员身份运行；游戏建议使用无边框窗口。宏软件同样属于第三方模拟输入，账号风险与软件内注入一致。
+                  <strong>使用宏时请不要同时点击软件内「开始演奏」</strong>；若软件正在运行，建议把宏触发键改为鼠标侧键，避免与软件的 F9 全局热键冲突。
+                </p>
+
+                <div className="macro-preview-tabs">
+                  {MACRO_PREVIEW_TABS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`macro-preview-tab ${macroPreviewKind === item.id ? 'active' : ''}`}
+                      onClick={() => setMacroPreviewKind(item.id)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <pre className="macro-preview">{macroPreview || '暂无数据'}</pre>
+                <div className="inline-actions">
+                  <button type="button" className="button ghost small" disabled={!macroExports} onClick={() => void copyMacroText(macroPreviewKind)}>
+                    复制完整内容
+                  </button>
+                  <button type="button" className="button ghost small" disabled={!macroExports} onClick={() => void exportMacro(macroPreviewKind)}>
+                    导出当前格式
+                  </button>
+                  <span className="hint-text">触发键位表包含：全音域 38 键映射 + 本曲逐音触发表 + 组合统计</span>
+                </div>
+
+                <h5 className="macro-section-title">全音域触发键位表（{keyMapRows.length} 键）</h5>
+                <div className="macro-table-wrap">
+                  <table className="macro-table">
+                    <thead>
+                      <tr>
+                        <th>音名</th>
+                        <th>MIDI</th>
+                        <th>简谱</th>
+                        <th>八度</th>
+                        <th>键位记号</th>
+                        <th>触发方式</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {keyMapRows.map((row) => (
+                        <tr key={row.midi}>
+                          <td>{row.midiName}</td>
+                          <td>{row.midi}</td>
+                          <td>{row.degree === 8 ? '高音1' : row.degree}</td>
+                          <td>{row.octaveShift > 0 ? '+1' : row.octaveShift < 0 ? '-1' : '0'}</td>
+                          <td>
+                            <code>{row.keys}</code>
+                          </td>
+                          <td>{[row.modsLabel, row.keyLabel].filter(Boolean).join('+')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <h5 className="macro-section-title">
+                  本曲逐音触发（显示 {noteTriggerRows.length}/{plan?.stats.noteCount ?? 0}）
+                </h5>
+                <div className="macro-table-wrap">
+                  <table className="macro-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>开始(ms)</th>
+                        <th>保持(ms)</th>
+                        <th>音名</th>
+                        <th>键位</th>
+                        <th>触发方式</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {noteTriggerRows.map((row) => (
+                        <tr key={row.index}>
+                          <td>{row.index}</td>
+                          <td>{row.startMs}</td>
+                          <td>{row.holdMs}</td>
+                          <td>{row.midiName}</td>
+                          <td>
+                            <code>{row.keys}</code>
+                          </td>
+                          <td>{row.trigger}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="inline-actions">
+                  {plan && noteLimit < plan.stats.noteCount ? (
+                    <button type="button" className="button ghost small" onClick={() => setNoteLimit((value) => Math.min(plan.stats.noteCount, value + 300))}>
+                      加载更多 300 行
+                    </button>
+                  ) : null}
+                  <button type="button" className="button ghost small" onClick={() => void exportMacro('trigger-table')}>
+                    导出完整触发表
+                  </button>
+                </div>
               </div>
             ) : null}
           </section>
