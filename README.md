@@ -103,7 +103,7 @@ npm run dist:dir     # 只生成未打包目录，便于快速验证
 |---|---|
 | Windows | `release/delta-harmonica-<version>-x64.exe`（安装包）、`release/delta-harmonica-<version>-portable.exe`（便携版） |
 | macOS | `release/delta-harmonica-<version>-mac-x64.dmg` / `.zip`、`release/delta-harmonica-<version>-mac-arm64.dmg` / `.zip` |
-| Linux | `release/delta-harmonica-<version>-linux-x64.AppImage`、`release/delta-harmonica-<version>-linux-x64.deb` |
+| Linux | `release/delta-harmonica-<version>-linux-x86_64.AppImage`、`release/delta-harmonica-<version>-linux-amd64.deb` |
 
 可执行文件名称为 `DeltaHarmonicaStudio`（Windows 下为 `DeltaHarmonicaStudio.exe`）：可执行文件使用 ASCII 名以规避中文文件名下的原生崩溃风险；窗口标题、快捷方式与安装界面仍显示「三角洲口琴工坊」。
 

@@ -175,7 +175,10 @@ jobs:
 
       - name: Package
         shell: bash
-        run: npx electron-builder ${{ matrix.args }} --config electron-builder.yml
+        # --publish never 必须显式给：electron-builder 在 CI 里会「自动推断要发布」，
+        # 然后向我们要 GH_TOKEN 并以 exit 1 失败（日志里的 "Implicit publishing triggered by CI
+        # detection"）。发布统一由下面的 publish 作业用 softprops/action-gh-release 完成。
+        run: npx electron-builder ${{ matrix.args }} --config electron-builder.yml --publish never
 
       - name: List release files
         shell: bash

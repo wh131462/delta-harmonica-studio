@@ -98,13 +98,13 @@ npm run dist:linux   # Linux：AppImage + deb（默认当前架构）
 - **AppImage**：
 
   ```bash
-  chmod +x delta-harmonica-<version>-linux-x64.AppImage
-  ./delta-harmonica-<version>-linux-x64.AppImage
+  chmod +x delta-harmonica-<version>-linux-x86_64.AppImage
+  ./delta-harmonica-<version>-linux-x86_64.AppImage
   ```
 
   Ubuntu 22.04+ 若提示缺少 FUSE：安装 `libfuse2`，或改用 `--appimage-extract-and-run`。
 
-- **deb**：`sudo dpkg -i delta-harmonica-<version>-linux-x64.deb`，依赖缺失时执行 `sudo apt-get -f install`。
+- **deb**：`sudo dpkg -i delta-harmonica-<version>-linux-amd64.deb`，依赖缺失时执行 `sudo apt-get -f install`。
 - **Wayland**：全局快捷键与悬浮窗可用，但窗口定位、透明背景与置顶由桌面合成器决定；若悬浮窗位置异常，可在设置页重置位置或改用 X11 会话。
 - **托盘**：部分桌面（如未安装 AppIndicator 扩展的 GNOME）不显示托盘图标；此时关闭主窗口会直接退出应用，属于桌面环境限制。
 

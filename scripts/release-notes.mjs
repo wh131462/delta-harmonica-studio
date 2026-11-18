@@ -329,8 +329,9 @@ function downloadRows(version) {
       '拖入「应用程序」；首次打开请右键「打开」，或到「系统设置 → 隐私与安全性」放行',
     ],
     ['macOS 12+', 'x64 / arm64', `${base}-mac-{x64,arm64}.zip`, '免安装压缩包，解压后直接运行'],
-    ['Linux', 'x64', `${base}-linux-x64.AppImage`, '`chmod +x` 后直接运行'],
-    ['Linux', 'x64', `${base}-linux-x64.deb`, '`sudo apt install ./<文件>`'],
+    // Linux 的 ${arch} 由 electron-builder 映射成 AppImage 的 x86_64 与 deb 的 amd64
+    ['Linux', 'x64', `${base}-linux-x86_64.AppImage`, '`chmod +x` 后直接运行'],
+    ['Linux', 'x64', `${base}-linux-amd64.deb`, '`sudo apt install ./<文件>`'],
     ['通用', '—', 'SHA256SUMS.txt', '`sha256sum -c SHA256SUMS.txt` 校验全部产物'],
   ];
 }
