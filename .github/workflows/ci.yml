@@ -50,6 +50,11 @@ jobs:
       - name: Build renderer / main / preload
         run: npm run build
 
+      # 发布说明生成器只在打 tag 时才跑；这里做一次冒烟，避免发布时才发现脚本坏了
+      - name: Release notes smoke test
+        shell: bash
+        run: node scripts/release-notes.mjs --version 0.0.0-smoke.1 --out "$RUNNER_TEMP/release-notes.md"
+
       # 三端都跑一次未打包目录构建，提前暴露 electron-builder 的平台配置问题。
       - name: Package smoke test (unpacked)
         run: npm run dist:dir
