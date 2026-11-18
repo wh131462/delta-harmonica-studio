@@ -11,7 +11,6 @@
   const DHS = window.DHS;
   if (!DHS) return;
 
-  const REPO_RELEASES = 'https://github.com/wh131462/delta-harmonica-studio/releases';
   const PLATFORMS = ['windows', 'macos', 'linux'];
   const PLATFORM_LABELS = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
   const KIND_LABELS = {
@@ -26,7 +25,6 @@
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-
   const state = {
     release: null,
     detected: normalizePlatform(DHS.detectPlatform()),
@@ -287,16 +285,15 @@
       createText(
         'p',
         'dl-empty',
-        hasAssets ? '这个平台暂时没有可下载的文件。' : '首次发布后在此直接下载。',
+        hasAssets ? '这个平台暂时没有可下载的文件。' : '正在获取最新安装包…',
       ),
     );
-    const link = document.createElement('a');
-    link.className = 'btn btn--primary btn--block';
-    link.href = REPO_RELEASES;
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    link.textContent = '前往 GitHub Releases';
-    host.append(link);
+    const placeholder = document.createElement('button');
+    placeholder.type = 'button';
+    placeholder.className = 'btn btn--primary btn--block';
+    placeholder.disabled = true;
+    placeholder.textContent = '暂无安装包';
+    host.append(placeholder);
   }
 
   function renderPlatform(platform, rows, hasAssets) {

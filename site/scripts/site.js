@@ -455,6 +455,45 @@
     }
   }
 
+  /**
+   * 首页主下载按钮：Windows / Linux 直接命中安装包文件（GitHub 会以附件形式直接下载，
+   * 不会跳到 Release 页面）；macOS 有 arm64 / x64 两种架构，交给下载页选择。
+   */
+  function pickDirectAsset(release, platform) {
+    if (!release || !Array.isArray(release.assets) || release.assets.length === 0) return null;
+    const groups = groupAssets(release.assets);
+    if (platform === 'windows') {
+      return groups.windows.find((item) => item.kind === 'installer') || groups.windows[0] || null;
+    }
+    if (platform === 'linux') {
+      return groups.linux.find((item) => item.kind === 'appimage') || groups.linux[0] || null;
+    }
+    return null;
+  }
+
+  function applyDirectDownloadLinks(release) {
+    const platform = detectPlatform();
+    const picked = pickDirectAsset(release, platform);
+    $$('[data-download-direct]').forEach((el) => {
+      if (!el.dataset.fallbackHref) {
+        el.dataset.fallbackHref = el.getAttribute('href') || './downloads.html';
+      }
+      if (picked) {
+        el.setAttribute('href', picked.asset.browser_download_url);
+        el.setAttribute('download', '');
+        el.setAttribute('rel', 'noreferrer');
+        el.dataset.directDownload = 'true';
+        el.setAttribute('title', `直接下载 ${picked.asset.name}`);
+      } else {
+        el.setAttribute('href', el.dataset.fallbackHref);
+        el.removeAttribute('download');
+        el.removeAttribute('rel');
+        el.removeAttribute('title');
+        delete el.dataset.directDownload;
+      }
+    });
+  }
+
   function applyReleaseUI(release) {
     const version = release && release.version ? String(release.version) : '';
     $$('[data-release-version]').forEach((el) => {
@@ -465,7 +504,9 @@
       );
     });
     $$('[data-release-date]').forEach((el) => {
-      el.textContent = release && release.publishedAt ? formatDate(release.publishedAt) : '尚未发布';
+      el.textContent = release && release.publishedAt
+        ? formatDate(release.publishedAt)
+        : '尚未发布';
     });
     $$('[data-release-date-iso]').forEach((el) => {
       if (release && release.publishedAt) el.setAttribute('datetime', release.publishedAt);
@@ -474,10 +515,12 @@
     const groups = groupAssets(release ? release.assets : []);
     const installer =
       groups.windows.find((item) => item.kind === 'installer') || groups.windows[0] || null;
-    const primaryUrl = installer ? installer.asset.browser_download_url : (release && release.htmlUrl) || `${REPO_URL}/releases`;
-    $$('[data-download-primary]').forEach((el) => {
-      el.setAttribute('href', primaryUrl);
-    });
+    if (installer) {
+      $$('[data-download-primary]').forEach((el) => {
+        el.setAttribute('href', installer.asset.browser_download_url);
+      });
+    }
+    applyDirectDownloadLinks(release);
     $$('[data-release-url]').forEach((el) => {
       el.setAttribute('href', (release && release.htmlUrl) || `${REPO_URL}/releases`);
     });
