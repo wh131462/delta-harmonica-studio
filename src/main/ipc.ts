@@ -16,6 +16,7 @@ import type {
   SaveFileRequest,
 } from '@shared/types';
 import { getWin32Bridge } from './native/win32';
+import { debugLog } from './debug';
 import type { PlaybackController } from './playback-controller';
 import type { AppStorage } from './storage';
 
@@ -137,6 +138,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     isPackaged: app.isPackaged,
     startPage: context.startPage,
     autotest: process.env.DFH_AUTOTEST === '1',
+    gameAutoplay: process.env.DFH_GAME_AUTOPLAY === '1',
   }));
 
   ipcMain.handle('app:relaunchElevated', () => relaunchElevated());
@@ -247,7 +249,15 @@ export function registerIpcHandlers(context: IpcContext): void {
     return result.filePath;
   });
 
-  ipcMain.handle('playback:start', (_event, request: PlaybackRequest) => playback.start(request));
+  ipcMain.handle('playback:start', (_event, request: PlaybackRequest) => {
+    debugLog(
+      `playback:start events=${request.events?.length ?? 0} backend=${request.backend} target=${String(request.targetWindowHandle)} focusGuard=${String(request.focusGuard)} countdown=${String(request.countdownSeconds)}`,
+    );
+    return playback.start(request).then((result) => {
+      debugLog(`playback:start result=${JSON.stringify(result)}`);
+      return result;
+    });
+  });
   ipcMain.handle('playback:stop', async () => {
     await playback.stop();
   });

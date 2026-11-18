@@ -119,6 +119,7 @@ async function bootstrap(): Promise<void> {
   await storage.init();
   debugLog('storage initialized');
   playback = new PlaybackController((status) => {
+    debugLog(`playback status: ${JSON.stringify(status)}`);
     mainWindow?.webContents.send('playback:status', status);
   });
 

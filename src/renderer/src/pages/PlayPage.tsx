@@ -160,7 +160,7 @@ export function PlayPage(): JSX.Element {
       app.showToast('warning', '未以管理员权限运行：游戏会静默丢弃注入的按键。请点击顶部状态栏的「以管理员重启」。');
       return;
     }
-    if (requiresMouseFire && !confirmSafety) {
+    if (requiresMouseFire && !confirmSafety && !app.appInfo?.gameAutoplay) {
       app.showToast('warning', '本谱需要按下鼠标左/右键（游戏中为开火/开镜），请先勾选安全确认');
       return;
     }
@@ -209,6 +209,23 @@ export function PlayPage(): JSX.Element {
 
   const startRef = useRef(startPlayback);
   startRef.current = startPlayback;
+  const autoStartedRef = useRef(false);
+
+  // 实机自动化测试：DFH_GAME_AUTOPLAY=1 时，等曲谱与目标窗口就绪后自动开始演奏
+  useEffect(() => {
+    if (!app.appInfo?.gameAutoplay || autoStartedRef.current) return undefined;
+    if (!plan || !score || plan.notes.length === 0) return undefined;
+    if (!app.settings.input.targetWindowHandle) return undefined;
+    const timer = setTimeout(() => {
+      if (autoStartedRef.current) return;
+      autoStartedRef.current = true;
+      setConfirmSafety(true);
+      app.showToast('info', '自动测试模式：2 秒后开始演奏，请留在游戏窗口');
+      void startPlayback();
+    }, 2200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.appInfo?.gameAutoplay, plan, score, app.settings.input.targetWindowHandle]);
 
   // F9 全局热键：开始/停止
   useEffect(() => {

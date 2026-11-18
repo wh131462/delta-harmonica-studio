@@ -64,6 +64,8 @@ export interface AppInfo {
   startPage: string;
   /** 自动化自检模式（DFH_AUTOTEST=1 时打开输入自检弹窗） */
   autotest: boolean;
+  /** 自动化实机测试模式（DFH_GAME_AUTOPLAY=1 时启动后自动开始演奏） */
+  gameAutoplay: boolean;
 }
 
 export interface WindowInfo {
