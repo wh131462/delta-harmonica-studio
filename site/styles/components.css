@@ -747,6 +747,18 @@
   line-height: 1.8;
 }
 
+.footer-star a {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--hairline-strong);
+  text-underline-offset: 3px;
+}
+
+.footer-star a:hover {
+  color: var(--text-1);
+  text-decoration-color: var(--accent-line);
+}
+
 .footer-bottom {
   display: flex;
   flex-wrap: wrap;

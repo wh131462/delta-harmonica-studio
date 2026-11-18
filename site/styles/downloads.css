@@ -12,7 +12,7 @@
 }
 
 /* ============================================================
-   Hero：紧凑的版本信息 + 平台跳转，右侧一张 Star 小卡
+   Hero：最新版本信息 + 下载动作 + 平台跳转
    ============================================================ */
 
 .dl-hero {
@@ -22,7 +22,7 @@
 
 .dl-hero__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 304px);
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(32px, 5vw, 72px);
   align-items: start;
 }
@@ -33,6 +33,14 @@
   align-items: flex-start;
   gap: var(--sp-5);
   min-inline-size: 0;
+  max-inline-size: 880px;
+}
+
+.dl-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-block-start: var(--sp-2);
 }
 
 .dl-hero__title {
@@ -86,8 +94,7 @@
   gap: var(--sp-2);
 }
 
-.dl-hero__jumps {
-  display: flex;
+.dl-hero__jumps {  display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin-block-start: var(--sp-2);
@@ -120,38 +127,6 @@
   font-size: var(--fs-micro);
   font-weight: 500;
   letter-spacing: .02em;
-}
-
-/* Star 小卡 */
-.dl-star-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-.dl-star-card__title {
-  color: var(--text-1);
-  font-size: var(--fs-h3);
-  font-weight: 600;
-  letter-spacing: -.01em;
-  line-height: 1.35;
-}
-
-.dl-star-card__text {
-  color: var(--text-2);
-  font-size: var(--fs-sm);
-  line-height: 1.72;
-}
-
-.dl-star-card__action {
-  margin-block-start: var(--sp-1);
-}
-
-.dl-star-card__foot {
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: var(--fs-micro);
-  letter-spacing: .05em;
 }
 
 /* ============================================================
@@ -216,6 +191,32 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sp-3);
+}
+
+.dl-card__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 42px;
+  block-size: 42px;
+  flex: none;
+  border-radius: var(--r-lg);
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+.dl-card__logo svg {
+  inline-size: 23px;
+  block-size: 23px;
+}
+
+.dl-card__head > div {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.dl-card.is-active .dl-card__logo {
+  background: var(--surface-4);
 }
 
 .dl-card__title {
@@ -712,55 +713,12 @@
 }
 
 /* ============================================================
-   Star 欢迎区
-   ============================================================ */
-
-.dl-star__panel {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sp-4);
-  padding: clamp(28px, 4.5vw, 56px);
-  border-radius: var(--r-xl);
-  background: var(--surface-2);
-}
-
-.dl-star__title {
-  max-inline-size: 20em;
-  font-family: var(--font-display);
-  font-size: var(--fs-h2);
-  font-weight: 650;
-  letter-spacing: -.02em;
-  line-height: 1.16;
-}
-
-.dl-star__lead {
-  max-inline-size: 54ch;
-  color: var(--text-2);
-  font-size: var(--fs-lead);
-  line-height: 1.75;
-}
-
-.dl-star__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  margin-block-start: var(--sp-2);
-}
-
-.dl-star__count {
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  opacity: .68;
-}
-
-/* ============================================================
    响应式
    ============================================================ */
 
 @media (max-width: 1080px) {
   .dl-hero__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 272px);
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-8);
   }
 }
@@ -769,12 +727,6 @@
   .dl-hero__grid {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-8);
-  }
-
-
-
-  .dl-star-card {
-    max-inline-size: 420px;
   }
 
   .dl-cards {
@@ -831,20 +783,6 @@
 
   .dl-panel {
     padding-block-start: var(--sp-5);
-  }
-
-  .dl-star__actions {
-    inline-size: 100%;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .dl-star__actions .btn {
-    inline-size: 100%;
-  }
-
-  .dl-star__panel {
-    padding: var(--sp-6) var(--sp-5);
   }
 
   .dl-table th,

@@ -51,11 +51,6 @@
       <a class="nav__link" href="./downloads.html">下载</a>
     </nav>
     <div class="nav__actions">
-      <a class="btn btn--secondary btn--sm star-button" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.07.78 2.16v3.2c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-        <span>Star</span>
-        <span class="star-button__count" data-star-count>—</span>
-      </a>
       <button class="menu-button" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-nav" aria-label="打开菜单">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
@@ -66,24 +61,25 @@
     <a class="mobile-nav__link" href="./#workflow">流程</a>
     <a class="mobile-nav__link" href="./#practice">练习</a>
     <a class="mobile-nav__link" href="./downloads.html">下载</a>
-    <div class="mobile-nav__actions">
-      <a class="btn btn--secondary" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">Star 项目</a>
-    </div>
   </nav>
 </header>
 
 <main id="main" class="dl-main">
-  <!-- 紧凑 Hero：一句话说清三端差异，版本信息来自 release 数据 -->
+  <!-- 紧凑 Hero：一句话说清三端差异，版本信息来自最新 Release 数据 -->
   <section class="dl-hero" aria-labelledby="dl-hero-title">
     <div class="container dl-hero__grid">
       <div class="dl-hero__copy">
         <p class="section-label">下载</p>
         <h1 class="dl-hero__title" id="dl-hero-title">装好它，<br />把喜欢的歌带进游戏。</h1>
         <p class="dl-hero__lead">Windows 10 / 11 拿到完整功能：编辑、导入、练习、试听、导出宏，并把按键送进游戏。macOS 12+ 与 Linux 保留其余全部能力，用排练模式走完时间轴。</p>
+        <div class="dl-hero__actions">
+          <a class="btn btn--accent btn--lg" href="#platforms">下载最新版</a>
+          <a class="btn btn--secondary btn--lg" href="#install">查看安装步骤</a>
+        </div>
         <div class="dl-hero__meta">
           <span class="dl-release">
-            <span class="dl-release__label">版本</span>
-            <span class="chip chip--mono dl-release__version" data-release-version>v0.3.0</span>
+            <span class="dl-release__label">最新版本</span>
+            <span class="chip chip--mono dl-release__version" data-release-version>—</span>
           </span>
           <span class="dl-release">
             <span class="dl-release__label">最近更新</span>
@@ -100,20 +96,10 @@
           <a class="dl-jump" href="#linux" data-jump-platform="linux">Linux<span class="dl-jump__meta">排练</span></a>
         </div>
       </div>
-      <aside class="card dl-star-card" aria-label="Star 项目">
-        <p class="dl-star-card__title">Star 项目</p>
-        <p class="dl-star-card__text">Star 不会解锁功能，但会让它被更多人看见。</p>
-        <a class="btn btn--secondary btn--block dl-star-card__action" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.07.78 2.16v3.2c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-          <span>在 GitHub 点 Star</span>
-          <span class="star-button__count" data-star-count>—</span>
-        </a>
-        <p class="dl-star-card__foot">开源 · MIT 许可 · 无遥测</p>
-      </aside>
     </div>
   </section>
 
-  <!-- 三平台下载卡片：资产由 downloads.js 按 ./release.json 渲染 -->
+  <!-- 三平台下载卡片：资产由 downloads.js 按最新 Release 数据渲染 -->
   <section class="section" id="platforms" aria-labelledby="dl-platforms-title">
     <div class="container">
       <div class="dl-section-head">
@@ -138,6 +124,9 @@
       <div class="dl-cards">
         <article class="card dl-card is-active" id="windows" data-platform-card="windows" aria-labelledby="dl-windows-title">
           <header class="dl-card__head">
+            <span class="dl-card__logo" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 11.2 4.4v7.2H3V5.5Zm9.3-1.3L21 3v8.6h-8.7V4.2ZM3 12.8h8.2v7.2L3 18.9v-6.1Zm9.3 0H21V21l-8.7-1.2v-7Z"/></svg>
+            </span>
             <div>
               <h3 class="dl-card__title" id="dl-windows-title">Windows</h3>
               <p class="dl-card__os">Windows 10 / 11 · x64</p>
@@ -147,13 +136,16 @@
           <p class="dl-card__text">完整功能：编辑、导入、练习、试听、宏导出，以及向游戏注入键鼠。</p>
           <div class="dl-assets" data-assets="windows">
             <p class="dl-empty">首次发布后在此直接下载。</p>
-            <a class="btn btn--secondary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
+            <a class="btn btn--primary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
           </div>
           <p class="dl-card__hint">首次使用建议以管理员身份运行，否则游戏会静默丢弃模拟按键。</p>
         </article>
 
         <article class="card dl-card" id="macos" data-platform-card="macos" aria-labelledby="dl-macos-title">
           <header class="dl-card__head">
+            <span class="dl-card__logo" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.9 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.9-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 6.9 1.1 9.2.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7c1.2 0 2-1.1 2.7-2.2.9-1.3 1.2-2.5 1.2-2.6-.1 0-2-.8-2-3.5Z"/><path d="M14.5 6.1c.6-.8 1.1-1.9 1-3-.9.1-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3Z"/></svg>
+            </span>
             <div>
               <h3 class="dl-card__title" id="dl-macos-title">macOS</h3>
               <p class="dl-card__os">macOS 12+ · arm64 / x64</p>
@@ -163,13 +155,16 @@
           <p class="dl-card__text">编辑、导入、练习、试听与宏导出可用；「开始演奏」以排练模式走时间轴。</p>
           <div class="dl-assets" data-assets="macos">
             <p class="dl-empty">首次发布后在此直接下载。</p>
-            <a class="btn btn--secondary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
+            <a class="btn btn--primary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
           </div>
           <p class="dl-card__hint">未签名、未公证：首次打开需右键「打开」，或到「隐私与安全性」点「仍要打开」。</p>
         </article>
 
         <article class="card dl-card" id="linux" data-platform-card="linux" aria-labelledby="dl-linux-title">
           <header class="dl-card__head">
+            <span class="dl-card__logo" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.2c-2 0-3.2 1.6-3.2 3.6 0 1 .3 1.6.3 2.4 0 .8-.6 1.5-1.4 2.8-.9 1.5-2 3.3-2.1 4.9-.1 1 .2 1.8.9 2.1.3.1.7.1.9-.1v-.9c.1-1.2.9-2.4 1.6-3.3-.3 1.7-.6 3.5-.2 5 .4 1.7 1.7 2.6 3.3 2.6s2.9-.9 3.3-2.6c.4-1.5.1-3.3-.2-5 .7.9 1.5 2.1 1.6 3.3v.9c.2.2.6.2.9.1.7-.3 1-1.1.9-2.1-.1-1.6-1.2-3.4-2.1-4.9-.8-1.3-1.4-2-1.4-2.8 0-.8.3-1.4.3-2.4 0-2-1.2-3.6-3.2-3.6Z"/><circle cx="10.4" cy="7.1" r=".8" fill="var(--surface-1)"/><circle cx="13.6" cy="7.1" r=".8" fill="var(--surface-1)"/><path fill="var(--accent)" d="M10.9 8.5h2.2L12 10.2l-1.1-1.7Z"/></svg>
+            </span>
             <div>
               <h3 class="dl-card__title" id="dl-linux-title">Linux</h3>
               <p class="dl-card__os">主流发行版 · x64</p>
@@ -179,7 +174,7 @@
           <p class="dl-card__text">编辑、导入、练习、试听与宏导出可用；Wayland 下悬浮窗与快捷键受桌面限制。</p>
           <div class="dl-assets" data-assets="linux">
             <p class="dl-empty">首次发布后在此直接下载。</p>
-            <a class="btn btn--secondary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
+            <a class="btn btn--primary btn--block" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer">前往 GitHub Releases</a>
           </div>
           <p class="dl-card__hint">AppImage 需要 chmod +x；Ubuntu 22.04+ 可能还需要 libfuse2。</p>
         </article>
@@ -460,25 +455,6 @@
       </div>
     </div>
   </section>
-
-  <!-- Star 欢迎区：全页第二个实心琥珀动作 -->
-  <section class="section" aria-labelledby="dl-star-title">
-    <div class="container">
-      <div class="dl-star__panel">
-        <p class="section-label">开源</p>
-        <h2 class="dl-star__title" id="dl-star-title">Star 不会解锁功能，但它值得被看见。</h2>
-        <p class="dl-star__lead">没有账号系统、没有遥测、也没有付费挡板。如果它帮你把一首歌带进了游戏，点个 Star 就是最直接的支持。</p>
-        <div class="dl-star__actions">
-          <a class="btn btn--accent btn--lg" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.07.78 2.16v3.2c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-            <span>在 GitHub 点 Star</span>
-            <span class="dl-star__count" data-star-count>—</span>
-          </a>
-          <a class="btn btn--secondary btn--lg" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">查看仓库</a>
-        </div>
-      </div>
-    </div>
-  </section>
 </main>
 
 <footer class="site-footer">
@@ -524,6 +500,7 @@
     <div class="footer-note">
       <p>非官方工具，与腾讯及天美工作室群无关。《三角洲行动》及相关素材版权归原权利人所有。游戏官方已将第三方软件、脚本、鼠标宏等自动操作列为违规行为，最高封禁 10 年；Windows 版通过 Windows 输入 API 模拟键鼠，不包含任何反检测机制，使用风险自负。</p>
       <p>试听采样：口琴 VCSL Hohner Special 20（CC0）；钢琴 Alexander Holm · Salamander Grand Piano（CC BY 3.0）。代码以 MIT 许可发布。</p>
+      <p class="footer-star">如果这个项目帮到了你，欢迎在 <a href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">GitHub 点一颗 Star</a>。</p>
     </div>
     <div class="footer-bottom">
       <span>© <span data-year>2026</span> Delta Harmonica Studio</span>
@@ -533,3 +510,4 @@
 </footer>
 </body>
 </html>
+
