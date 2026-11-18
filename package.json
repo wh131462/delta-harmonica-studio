@@ -1,0 +1,18 @@
+{
+  "name": "delta-harmonica-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "三角洲行动·守夜人口琴 自动演奏工作台：简谱编辑 / MIDI·音频分析转谱 / 演奏方案管理 / 低延迟键鼠注入",
+  "main": "./out/main/index.js",
+  "license": "MIT",
+  "author": "auto-player",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@tonejs/midi": "^2.0.28",
+    "koffi": "^3.3.8",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

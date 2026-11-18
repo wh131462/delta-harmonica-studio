@@ -1,0 +1,46 @@
+appId: com.dhstudio.delta-harmonica
+productName: 三角洲口琴工坊
+copyright: 非官方工具，仅供个人练习与娱乐使用
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+asar: true
+asarUnpack:
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/**/*
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  # Electron 45 在中文 exe 文件名下会出现原生断言崩溃（STATUS_BREAKPOINT），因此执行文件用 ASCII 名，
+  # 安装包/快捷方式/窗口标题仍显示中文「三角洲口琴工坊」。
+  executableName: DeltaHarmonicaStudio
+  # 注意：Electron 45 + requireAdministrator 清单会出现 STATUS_BREAKPOINT 原生崩溃（已实测），
+  # 因此安装包以普通权限启动；应用内检测到未提权时提示用户点「以管理员身份重启」（UAC）后再注入游戏。
+  requestedExecutionLevel: asInvoker
+  artifactName: delta-harmonica-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 三角洲口琴工坊
+  installerLanguages:
+    - zh_CN
+
+portable:
+  artifactName: delta-harmonica-${version}-portable.${ext}

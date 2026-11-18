@@ -1,0 +1,199 @@
+/**
+ * ScoreView 样式 —— 暗色主题 + CSS 变量。
+ *
+ * 变量采用「使用处 + 默认值」的写法（`var(--sv-ink, #e8edf7)`），因此在任意父容器上
+ * 声明同名变量即可整体换肤，无需覆盖 .sv-score 自身：
+ *
+ *   <div style={{ '--sv-ink': '#1f2430', '--sv-accent': '#d97706' }}>
+ *     <ScoreView score={score} />
+ *   </div>
+ *
+ * 可覆盖变量（括号内为暗色默认值）：
+ *   --sv-ink             数字 / 墨迹主色（#e8edf7）
+ *   --sv-ink-dim         小节号 / 歌词等次要文字（#8d99ad）
+ *   --sv-rest-ink        休止符数字（#b9c4d6）
+ *   --sv-accent          播放中高亮色（#ffb454）
+ *   --sv-accent-soft     播放中高亮底色（rgba(255,180,84,.16)）
+ *   --sv-accent-line     播放中高亮描边（rgba(255,180,84,.6)）
+ *   --sv-selected-fill   编辑器选中底色（rgba(96,165,250,.16)）
+ *   --sv-selected-stroke 编辑器选中描边（rgba(96,165,250,.75)）
+ *   --sv-hover           鼠标悬停强调色（#ffe0a8）
+ *   --sv-barline         普通小节线（#58657c）
+ *   --sv-barline-strong  行首线 / 终止线（#d7dfee）
+ *   --sv-tie             连音线（#8b9bb7）
+ *   --sv-font-sans       界面 / 歌词字体族
+ *   --sv-font-num        简谱数字字体族
+ *   --sv-font-lyric      歌词字体族
+ */
+
+.sv-score {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: transparent;
+  color: var(--sv-ink, #e8edf7);
+  font-family: var(--sv-font-sans, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+  -webkit-user-select: none;
+  user-select: none;
+  /* 放大（zoom > 1）时可横向滚动，暗色细滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 155, 180, 0.35) transparent;
+}
+
+.sv-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--sv-font-sans, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+}
+
+/* ---------- 音符墨迹 ---------- */
+.sv-note {
+  transition: opacity 0.12s ease;
+}
+
+.sv-note--clickable {
+  cursor: pointer;
+}
+
+.sv-digit {
+  fill: var(--sv-ink, #e8edf7);
+  font-family: var(--sv-font-num, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+  font-weight: 600;
+}
+
+.sv-note--rest .sv-digit {
+  fill: var(--sv-rest-ink, #b9c4d6);
+}
+
+.sv-accidental {
+  fill: var(--sv-ink, #e8edf7);
+  font-family: var(--sv-font-num, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+  font-weight: 500;
+}
+
+.sv-octave-dot {
+  fill: var(--sv-ink, #e8edf7);
+}
+
+.sv-duration-dot {
+  fill: var(--sv-ink, #e8edf7);
+}
+
+.sv-underline,
+.sv-duration-dash {
+  stroke: var(--sv-ink, #e8edf7);
+  stroke-linecap: round;
+}
+
+.sv-lyric {
+  fill: var(--sv-ink-dim, #8d99ad);
+  font-family: var(--sv-font-lyric, 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+}
+
+/* ---------- 小节线 / 小节号 / 连音线 ---------- */
+.sv-barline {
+  stroke: var(--sv-barline, #58657c);
+  stroke-width: 1.4;
+}
+
+.sv-barline--start {
+  stroke: var(--sv-barline-strong, #d7dfee);
+  stroke-width: 1.6;
+}
+
+.sv-barline--final-thin {
+  stroke: var(--sv-barline-strong, #d7dfee);
+  stroke-width: 1.2;
+}
+
+.sv-barline--final-thick {
+  stroke: var(--sv-barline-strong, #d7dfee);
+  stroke-width: 3.2;
+}
+
+.sv-measure-number {
+  fill: var(--sv-ink-dim, #8d99ad);
+  font-family: var(--sv-font-sans, 'Segoe UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.sv-tie {
+  fill: none;
+  stroke: var(--sv-tie, #8b9bb7);
+  stroke-linecap: round;
+}
+
+/* ---------- 悬停 ---------- */
+.sv-note--clickable:hover .sv-digit,
+.sv-note--clickable:hover .sv-accidental,
+.sv-note--clickable:hover .sv-octave-dot,
+.sv-note--clickable:hover .sv-duration-dot {
+  fill: var(--sv-hover, #ffe0a8);
+}
+
+.sv-note--clickable:hover .sv-underline,
+.sv-note--clickable:hover .sv-duration-dash {
+  stroke: var(--sv-hover, #ffe0a8);
+}
+
+/* ---------- 选中（编辑器） ---------- */
+.sv-note-bg {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 1.4;
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+
+.sv-note--selected .sv-note-bg {
+  fill: var(--sv-selected-fill, rgba(96, 165, 250, 0.16));
+  stroke: var(--sv-selected-stroke, rgba(96, 165, 250, 0.75));
+}
+
+/* ---------- 播放中（演奏页） ---------- */
+.sv-note--active .sv-note-bg {
+  fill: var(--sv-accent-soft, rgba(255, 180, 84, 0.16));
+  stroke: var(--sv-accent-line, rgba(255, 180, 84, 0.6));
+}
+
+.sv-note--active .sv-digit {
+  fill: var(--sv-accent, #ffb454);
+}
+
+.sv-note--active .sv-accidental,
+.sv-note--active .sv-octave-dot,
+.sv-note--active .sv-duration-dot {
+  fill: var(--sv-accent, #ffb454);
+}
+
+.sv-note--active .sv-underline,
+.sv-note--active .sv-duration-dash {
+  stroke: var(--sv-accent, #ffb454);
+}
+
+/* 播放中的轻微呼吸动画（只改透明度，开销很小） */
+.sv-note--active {
+  animation: sv-note-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes sv-note-pulse {
+  from {
+    opacity: 0.72;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-note,
+  .sv-note-bg {
+    transition: none;
+  }
+  .sv-note--active {
+    animation: none;
+  }
+}
