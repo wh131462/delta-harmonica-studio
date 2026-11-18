@@ -1,8 +1,12 @@
 /**
- * 内置音源合成：口琴（贴近游戏内簧片音色）与钢琴（干净、便于核对音高）。
- * 纯 Web Audio 合成，无需外部采样，离线可用。
+ * 真实采样音源：口琴（VCSL Hohner Special 20，CC0）与
+ * 钢琴（Salamander Grand Piano，CC BY 3.0）。
+ *
+ * 所有采样随应用离线分发，首次试听前异步解码；播放时只做选层、轻微变速、
+ * 包络与颤音，不改变原始录音的频谱，避免又回到“电子合成器”的听感。
  */
 import type { PreviewInstrument } from '@shared/types';
+import { SAMPLE_ZONES, selectZone } from './sample-manifest';
 
 export interface InstrumentMeta {
   id: PreviewInstrument;
@@ -11,185 +15,138 @@ export interface InstrumentMeta {
 }
 
 export const INSTRUMENTS: readonly InstrumentMeta[] = [
-  { id: 'harmonica', name: '口琴', tagline: '簧片泛音 · 渐强 · 轻颤音' },
-  { id: 'piano', name: '钢琴', tagline: '击弦瞬态 · 自然衰减' },
+  { id: 'harmonica', name: '口琴', tagline: '真实簧片采样 · 呼吸起音 · 自然延音' },
+  { id: 'piano', name: '钢琴', tagline: 'Salamander 三角钢琴采样 · 自然衰减' },
 ];
 
 export function instrumentName(instrument: PreviewInstrument): string {
   return INSTRUMENTS.find((item) => item.id === instrument)?.name ?? '口琴';
 }
 
-// 每个 AudioContext 复用 PeriodicWave，避免每次发声重复构造
-const waveCache = new WeakMap<AudioContext, Map<string, PeriodicWave>>();
-const noiseCache = new WeakMap<AudioContext, AudioBuffer>();
+/** 每个音的目标峰值（再乘以 master 音量）；不同力度层的采样响度已在此归一化。 */
+const TARGET_PEAK: Record<PreviewInstrument, number> = {
+  harmonica: 0.36,
+  piano: 0.48,
+};
 
-function getWave(context: AudioContext, key: string, harmonics: readonly number[]): PeriodicWave {
-  let perContext = waveCache.get(context);
-  if (!perContext) {
-    perContext = new Map();
-    waveCache.set(context, perContext);
+const RELEASE_SEC: Record<PreviewInstrument, number> = {
+  harmonica: 0.12,
+  piano: 0.2,
+};
+
+interface LoadedSample {
+  buffer: AudioBuffer;
+  /** 原始采样峰值，用于逐层归一化 */
+  peak: number;
+  /** 循环区间（秒，相对 AudioBuffer 时间轴）；仅口琴使用 */
+  loopStart: number;
+  loopEnd: number;
+}
+
+let sharedContext: AudioContext | null = null;
+const sampleCache = new Map<string, LoadedSample>();
+const sampleLoads = new Map<string, Promise<LoadedSample>>();
+const instrumentLoads = new Map<PreviewInstrument, Promise<void>>();
+
+/** 全局复用一个 AudioContext：解码好的采样可以跨多次试听复用，切音色不中断。 */
+export function getAudioContext(): AudioContext {
+  if (!sharedContext || sharedContext.state === 'closed') {
+    sharedContext = new AudioContext({ latencyHint: 'interactive' });
   }
-  const cached = perContext.get(key);
+  return sharedContext;
+}
+
+/**
+ * 预解码某个音色的全部采样。重复调用会复用同一个 Promise；
+ * 失败后清除缓存，下一次试听可以重试（例如文件被占用/安装不完整）。
+ */
+export function preloadInstrument(instrument: PreviewInstrument): Promise<void> {
+  const cached = instrumentLoads.get(instrument);
   if (cached) return cached;
-  const real = new Float32Array(harmonics.length + 1);
-  const imag = new Float32Array(harmonics.length + 1);
-  for (let index = 0; index < harmonics.length; index += 1) imag[index + 1] = harmonics[index];
-  const wave = context.createPeriodicWave(real, imag, { disableNormalization: false });
-  perContext.set(key, wave);
-  return wave;
+  const pending = (async () => {
+    const context = getAudioContext();
+    await Promise.all(SAMPLE_ZONES[instrument].map((zone) => loadSample(context, zone.file)));
+  })().catch((error: unknown) => {
+    instrumentLoads.delete(instrument);
+    throw error;
+  });
+  instrumentLoads.set(instrument, pending);
+  return pending;
 }
 
-function getNoiseBuffer(context: AudioContext): AudioBuffer {
-  const cached = noiseCache.get(context);
-  if (cached) return cached;
-  const length = Math.floor(context.sampleRate * 0.12);
-  const buffer = context.createBuffer(1, length, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let index = 0; index < length; index += 1) {
-    const envelope = Math.pow(1 - index / length, 2);
-    data[index] = (Math.random() * 2 - 1) * envelope;
-  }
-  noiseCache.set(context, buffer);
-  return buffer;
+function loadSample(context: AudioContext, file: string): Promise<LoadedSample> {
+  const cached = sampleCache.get(file);
+  if (cached) return Promise.resolve(cached);
+  const pending = sampleLoads.get(file);
+  if (pending) return pending;
+
+  const load = (async () => {
+    if (!window.api?.samples?.read) throw new Error('音源接口不可用');
+    const data = await window.api.samples.read(file);
+    const bytes = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+    const buffer = await context.decodeAudioData(bytes);
+    const sample = prepareSample(buffer, file);
+    sampleCache.set(file, sample);
+    return sample;
+  })().finally(() => sampleLoads.delete(file));
+
+  sampleLoads.set(file, load);
+  return load;
 }
 
-function midiToFrequency(midi: number): number {
-  return 440 * 2 ** ((midi - 69) / 12);
-}
-
-/** 口琴：富含奇偶次泛音的簧片音色，慢起音 + 渐强 + 轻颤音 + 起音气流声 */
-function scheduleHarmonica(
-  context: AudioContext,
-  destination: AudioNode,
-  frequency: number,
-  when: number,
-  duration: number,
-): void {
-  const hold = Math.max(0.12, duration);
-  const wave = getWave(context, 'harmonica', [1, 0.62, 0.46, 0.34, 0.25, 0.18, 0.12, 0.08]);
-
-  const filter = context.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(5200, when);
-  filter.frequency.linearRampToValueAtTime(3600, when + Math.min(0.6, hold));
-  filter.Q.value = 0.9;
-
-  const gain = context.createGain();
-  const peak = 0.16 * (0.82 + Math.min(0.25, frequency / 2400));
-  const swellTime = Math.min(0.5, Math.max(0.06, hold * 0.55));
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.linearRampToValueAtTime(peak * 0.5, when + 0.022);
-  gain.gain.linearRampToValueAtTime(peak, when + swellTime);
-  gain.gain.setValueAtTime(peak, when + hold);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + hold + 0.12);
-  filter.connect(gain).connect(destination);
-
-  const osc = context.createOscillator();
-  osc.setPeriodicWave(wave);
-  osc.frequency.value = frequency;
-  osc.detune.value = -2;
-  osc.connect(filter);
-
-  const osc2 = context.createOscillator();
-  osc2.setPeriodicWave(wave);
-  osc2.frequency.value = frequency;
-  osc2.detune.value = 4;
-  const bodyGain = context.createGain();
-  bodyGain.gain.value = 0.32;
-  osc2.connect(bodyGain).connect(filter);
-
-  // 颤音（稍晚进入，更接近口琴/口风琴的自然听感）
-  let lfo: OscillatorNode | null = null;
-  if (hold > 0.28) {
-    lfo = context.createOscillator();
-    lfo.frequency.value = 5.3;
-    const lfoGain = context.createGain();
-    const depth = 7 + Math.min(6, frequency / 220);
-    lfoGain.gain.setValueAtTime(0, when);
-    lfoGain.gain.linearRampToValueAtTime(depth, when + 0.35);
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.detune);
-    lfoGain.connect(osc2.detune);
-    lfo.start(when);
-    lfo.stop(when + hold + 0.25);
+function prepareSample(buffer: AudioBuffer, file: string): LoadedSample {
+  const peak = samplePeak(buffer);
+  if (!file.startsWith('harmonica/')) {
+    return { buffer, peak, loopStart: 0, loopEnd: buffer.duration };
   }
 
-  // 起音气流声
-  const noise = context.createBufferSource();
-  noise.buffer = getNoiseBuffer(context);
-  const noiseFilter = context.createBiquadFilter();
-  noiseFilter.type = 'bandpass';
-  noiseFilter.frequency.value = Math.min(3600, 900 + frequency * 1.4);
-  noiseFilter.Q.value = 0.8;
-  const noiseGain = context.createGain();
-  noiseGain.gain.setValueAtTime(0.02, when);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + 0.09);
-  noise.connect(noiseFilter).connect(noiseGain).connect(destination);
-
-  osc.start(when);
-  osc.stop(when + hold + 0.16);
-  osc2.start(when);
-  osc2.stop(when + hold + 0.16);
-  noise.start(when);
-  noise.stop(when + 0.1);
+  // 口琴是持续音：在 1.15s~2.10s 之间做一段 120ms 的尾首交叉淡化，
+  // 让长音可以无缝循环，同时避开采样末尾的收尾淡出。
+  const loopStart = Math.min(buffer.duration * 0.48, 1.15);
+  const loopEnd = Math.min(buffer.duration - 0.08, loopStart + 0.95);
+  if (loopEnd - loopStart > 0.3) {
+    crossfadeLoopSeam(buffer, loopStart, loopEnd, 0.12);
+  }
+  return { buffer, peak, loopStart, loopEnd };
 }
 
-/** 钢琴：击弦瞬态 + 泛音列 + 指数衰减 + 轻微琴弦失谐 */
-function schedulePiano(
-  context: AudioContext,
-  destination: AudioNode,
-  frequency: number,
-  when: number,
-  duration: number,
-): void {
-  const wave = getWave(context, 'piano', [1, 0.52, 0.34, 0.22, 0.14, 0.09, 0.06, 0.04, 0.025]);
-  const gain = context.createGain();
-  const peak = 0.24;
-  const body = Math.max(0.35, Math.min(2.8, duration + 0.35));
+/** 把 loopEnd 前的尾音渐变到 loopStart 前的波形，循环回到 loopStart 时相位连续。 */
+function crossfadeLoopSeam(buffer: AudioBuffer, loopStart: number, loopEnd: number, fadeSec: number): void {
+  const sampleRate = buffer.sampleRate;
+  const fadeSamples = Math.min(
+    Math.floor(fadeSec * sampleRate),
+    Math.floor((loopEnd - loopStart) * sampleRate * 0.45),
+  );
+  const sourceStart = Math.floor((loopStart - fadeSec) * sampleRate);
+  const targetEnd = Math.floor(loopEnd * sampleRate);
+  if (fadeSamples <= 0 || sourceStart < 0) return;
 
-  const filter = context.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(6800, when);
-  filter.frequency.exponentialRampToValueAtTime(1400, when + Math.min(1.6, body));
-  filter.Q.value = 0.4;
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let index = 0; index < fadeSamples; index += 1) {
+      const mix = (index + 1) / fadeSamples;
+      const target = targetEnd - fadeSamples + index;
+      if (target < 0 || target >= data.length) break;
+      data[target] = data[target] * (1 - mix) + data[sourceStart + index] * mix;
+    }
+  }
+}
 
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.linearRampToValueAtTime(peak, when + 0.006);
-  gain.gain.exponentialRampToValueAtTime(peak * 0.32, when + 0.32);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + body);
-  filter.connect(gain).connect(destination);
+function samplePeak(buffer: AudioBuffer): number {
+  let peak = 0;
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let index = 0; index < data.length; index += 1) {
+      const value = Math.abs(data[index]);
+      if (value > peak) peak = value;
+    }
+  }
+  return Math.max(peak, 0.01);
+}
 
-  const osc = context.createOscillator();
-  osc.setPeriodicWave(wave);
-  osc.frequency.value = frequency;
-  osc.detune.value = -1;
-  osc.connect(filter);
-
-  const osc2 = context.createOscillator();
-  osc2.setPeriodicWave(wave);
-  osc2.frequency.value = frequency;
-  osc2.detune.value = 5;
-  const overtoneGain = context.createGain();
-  overtoneGain.gain.value = 0.22;
-  osc2.connect(overtoneGain).connect(filter);
-
-  // 击弦噪声
-  const noise = context.createBufferSource();
-  noise.buffer = getNoiseBuffer(context);
-  const noiseFilter = context.createBiquadFilter();
-  noiseFilter.type = 'highpass';
-  noiseFilter.frequency.value = 1200;
-  const noiseGain = context.createGain();
-  noiseGain.gain.setValueAtTime(0.03, when);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + 0.035);
-  noise.connect(noiseFilter).connect(noiseGain).connect(destination);
-
-  osc.start(when);
-  osc.stop(when + body + 0.05);
-  osc2.start(when);
-  osc2.stop(when + body + 0.05);
-  noise.start(when);
-  noise.stop(when + 0.05);
+function levelFor(instrument: PreviewInstrument, midi: number, peak: number): number {
+  const register = 0.94 + (1 - Math.min(1, Math.max(0, (midi - 48) / 36))) * 0.06;
+  return (TARGET_PEAK[instrument] / peak) * register;
 }
 
 export interface ScheduleNoteOptions {
@@ -203,12 +160,69 @@ export interface ScheduleNoteOptions {
   duration: number;
 }
 
-/** 在指定 AudioContext 时间点安排一个音符 */
-export function scheduleInstrumentNote(options: ScheduleNoteOptions): void {
-  const frequency = midiToFrequency(options.midi);
-  if (options.instrument === 'piano') {
-    schedulePiano(options.context, options.destination, frequency, options.when, options.duration);
-  } else {
-    scheduleHarmonica(options.context, options.destination, frequency, options.when, options.duration);
+/**
+ * 在指定 AudioContext 时间点安排一个真实采样音符。
+ * 返回需要由调用方停止的源节点（采样源 + 可选的颤音 LFO）。
+ */
+export function scheduleInstrumentNote(options: ScheduleNoteOptions): AudioScheduledSourceNode[] {
+  const { context, destination, instrument, midi, when, duration } = options;
+  const zone = selectZone(SAMPLE_ZONES[instrument], midi);
+  const sample = sampleCache.get(zone.file);
+  if (!sample) throw new Error(`音源尚未加载：${zone.file}`);
+
+  const hold = Math.max(0.04, duration);
+  const attack = instrument === 'piano' ? 0.003 : Math.min(0.016, Math.max(0.004, hold * 0.25));
+  const release = Math.min(RELEASE_SEC[instrument], Math.max(0.045, hold * 0.5));
+  const end = when + hold;
+  const stopAt = end + release + 0.02;
+
+  const source = context.createBufferSource();
+  source.buffer = sample.buffer;
+  source.playbackRate.value = 2 ** ((midi - zone.root) / 12);
+  source.detune.value = instrument === 'harmonica' ? -1.5 : -0.5;
+
+  if (instrument === 'harmonica' && hold + release > sample.loopStart + 0.1) {
+    source.loop = true;
+    source.loopStart = sample.loopStart;
+    source.loopEnd = sample.loopEnd;
   }
+
+  const gain = context.createGain();
+  const level = levelFor(instrument, midi, sample.peak);
+  gain.gain.setValueAtTime(0.0001, when);
+  gain.gain.linearRampToValueAtTime(level, when + attack);
+  gain.gain.setValueAtTime(level, end);
+  gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+  source.connect(gain);
+
+  if (instrument === 'piano') {
+    // 真实钢琴的每根弦在声场里有固定位置；单声道采样用轻量声像补一点键盘宽度。
+    const panner = context.createStereoPanner();
+    panner.pan.value = Math.max(-0.22, Math.min(0.22, (midi - 60) * 0.012));
+    gain.connect(panner).connect(destination);
+  } else {
+    gain.connect(destination);
+  }
+
+  // 从采样起音之后一点点进入，短音也能立刻听清，同时不削掉簧片的呼吸感。
+  const offset = instrument === 'harmonica' ? Math.min(0.035, sample.buffer.duration * 0.02) : 0;
+  source.start(when, offset);
+  source.stop(stopAt);
+
+  const sources: AudioScheduledSourceNode[] = [source];
+  if (instrument === 'harmonica' && hold > 0.55) {
+    const lfo = context.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 4.8;
+    const depth = context.createGain();
+    depth.gain.setValueAtTime(0, when);
+    depth.gain.linearRampToValueAtTime(4.2, when + Math.min(0.7, hold * 0.5));
+    lfo.connect(depth).connect(source.detune);
+    lfo.start(when);
+    lfo.stop(stopAt);
+    sources.push(lfo);
+  }
+
+  return sources;
 }
+
