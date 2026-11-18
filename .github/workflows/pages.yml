@@ -1,0 +1,88 @@
+name: Pages
+
+# 静态官网（site/）构建与 GitHub Pages 部署。
+#   1. 推送到 master / main 且改动命中站点相关路径时构建部署；
+#   2. GitHub Release 发布后自动重跑一次，让下载页刷新到最新版本与安装包列表；
+#   3. 也可在 Actions → Pages → Run workflow 手动触发。
+#
+# 站点由 scripts/build-site.mjs 零依赖构建：复制 site/ → dist-site/、复制 assets/icon.png、
+# 注入 {{SITE_VERSION}}、生成 release.json（优先 GitHub API，失败降级不阻断）、写 .nojekyll。
+# 首次使用前需在仓库 Settings → Pages 把 Source 设为 GitHub Actions（详见 docs/WEBSITE.md）。
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'site/**'
+      - 'scripts/build-site.mjs'
+      - 'scripts/serve-site.mjs'
+      - '.github/workflows/pages.yml'
+      - 'package.json'
+      - 'assets/icon.png'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# GITHUB_TOKEN 只读仓库内容（读 Release 数据），Pages 部署走 OIDC，不需要额外 secrets
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages 同一时刻只跑一条部署链：新的构建排队而不是打断正在进行的发布
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 站点构建零依赖，不需要 npm ci；GITHUB_TOKEN 用于读 Release 数据避免匿名限流
+      - name: Build static site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+        run: node scripts/build-site.mjs
+
+      - name: Verify build output
+        run: |
+          for file in index.html downloads.html release.json .nojekyll; do
+            if [ ! -f "dist-site/$file" ]; then
+              echo "::error::构建产物缺少 dist-site/$file"
+              exit 1
+            fi
+          done
+          echo "--- release.json ---"
+          cat dist-site/release.json
+          echo "--- dist-site ---"
+          ls -la dist-site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-site
+
+  deploy:
+    name: deploy pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
