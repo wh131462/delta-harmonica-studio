@@ -1,0 +1,784 @@
+/* =============================================================================
+   布局层 · 应用外壳（侧栏 / 顶栏 / 页面框架 / 播放条 / 启动页）
+   ============================================================================= */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: var(--canvas);
+}
+
+/* 键盘用户：Tab 第一下出现，直接跳到主内容 */
+.skip-link {
+  position: fixed;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: var(--z-toast);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent-line);
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  transform: translateY(-200%);
+  transition: transform var(--dur-1) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ============================ 侧栏 ============================ */
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  background: var(--surface-1);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2);
+  min-height: 32px;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-subtitle);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-1);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 34px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  text-align: left;
+  transition: background var(--dur-1) var(--ease-in-out), color var(--dur-1) var(--ease-in-out);
+}
+
+.nav-item > svg {
+  color: var(--text-3);
+  transition: color var(--dur-1) var(--ease-in-out);
+}
+
+.nav-item > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.nav-item:hover > svg {
+  color: var(--text-2);
+}
+
+.nav-item.active {
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.nav-item.active > svg {
+  color: var(--accent);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.nav-live {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+}
+
+.nav-dot {
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.permission-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  transition: background var(--dur-1) var(--ease-in-out), color var(--dur-1) var(--ease-in-out);
+}
+
+.permission-chip:hover {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.permission-chip.ok {
+  color: var(--ok);
+}
+
+.permission-chip.warn {
+  color: var(--warn);
+}
+
+.permission-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================ 主区域 ============================ */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ============================ 顶栏 ============================ */
+
+.topbar {
+  position: relative;
+  z-index: 10;
+  height: var(--topbar-h);
+  flex: 0 0 var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--page-pad-x);
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.topbar-score-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.topbar-score-line strong {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 var(--sp-1);
+  background: var(--line);
+}
+
+/* 输入通道状态：紧凑徽标，详情走 title；详细解释只在设置页出现 */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color var(--dur-1) var(--ease-in-out);
+}
+
+.status-pill:hover {
+  border-color: var(--line);
+}
+
+.status-pill.ok {
+  color: var(--ok);
+  border-color: var(--ok-line);
+  background: var(--ok-soft);
+}
+
+.status-pill.warn {
+  color: var(--warn);
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+}
+
+.status-pill.error {
+  color: var(--danger);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-4);
+}
+
+.status-dot.ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+
+.status-dot.warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+
+.status-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.playback-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.playback-chip.playback-playing {
+  color: var(--ok);
+  border-color: var(--ok-line);
+  background: var(--ok-soft);
+}
+
+.playback-chip.playback-countdown {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.playback-chip.playback-error,
+.playback-chip.playback-focus-lost {
+  color: var(--danger);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.hotkey-hint {
+  color: var(--text-4);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* ============================ 页面框架 ============================ */
+
+.page-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  background: var(--canvas-elev);
+}
+
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--page-pad-y) var(--page-pad-x) var(--sp-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  animation: page-in var(--dur-3) var(--ease-out);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  padding-top: var(--sp-1);
+}
+
+.page-header__text {
+  min-width: 0;
+}
+
+.page-header h1,
+.page-header h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  line-height: var(--lh-display);
+  font-weight: var(--fw-display);
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+
+.page-header p {
+  margin-top: 6px;
+  max-width: 76ch;
+  color: var(--text-3);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* ============================ 底部播放条 ============================ */
+
+.dock {
+  position: relative;
+  z-index: var(--z-dock);
+  flex: 0 0 var(--dock-h);
+  height: var(--dock-h);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--page-pad-x);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.dock-zone {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.dock-zone--grow {
+  flex: 1;
+}
+
+.dock-divider {
+  width: 1px;
+  height: 28px;
+  flex: 0 0 1px;
+  background: var(--line);
+}
+
+.dock-score {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 250px;
+}
+
+.dock-score strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-score small {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+}
+
+/* 试听进度：直接复用 .progress 基元，这里只负责在播放条里占位与收缩 */
+.dock-track {
+  flex: 1;
+  min-width: 80px;
+}
+
+.dock-time {
+  min-width: 84px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  text-align: right;
+}
+
+.dock-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.dock-progress > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transition: width 120ms linear;
+}
+
+/* ============================ 启动页 ============================ */
+
+.splash {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--canvas);
+}
+
+.splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.splash-mark {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.splash h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-1);
+}
+
+.splash p {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+.splash-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.splash-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: splash-pulse 1.1s ease-in-out infinite;
+}
+
+.splash-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.splash-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ============================ 响应式 ============================
+   宽度断点：
+     1280  收紧侧栏与辅助信息（热键提示、曲名宽度）
+     1180  页面改单列，播放条隐藏次要读数
+     1120  内边距再收紧一档，顶栏图标化，优先保证内容宽度
+     1080  侧栏折叠为图标轨（配合最小窗口 1024）
+   高度断点：
+     800   收紧顶栏 / 播放条 / 页面上下留白，保证 720 高窗口首屏可用
+   ================================================================ */
+
+@media (max-width: 1280px) {
+  :root {
+    --page-pad-x: 24px;
+    --sidebar-w: 216px;
+  }
+
+  .topbar-hotkeys,
+  .hotkey-hint {
+    display: none;
+  }
+
+  .dock-score {
+    max-width: 190px;
+  }
+}
+
+@media (max-width: 1180px) {
+  :root {
+    --page-max: 100%;
+    --topbar-h: 52px;
+  }
+
+  .page {
+    gap: var(--sp-4);
+  }
+
+  .topbar {
+    gap: var(--sp-3);
+  }
+
+  .dock {
+    gap: var(--sp-3);
+  }
+
+  .dock-volume,
+  .dock-time {
+    display: none;
+  }
+}
+
+/* 最小窗口附近：左右留白再收 4px；顶栏「悬浮窗」只留图标，把宽度让给曲名与状态 */
+@media (max-width: 1120px) {
+  :root {
+    --page-pad-x: var(--sp-5);
+    --page-pad-y: var(--sp-5);
+  }
+
+  .topbar,
+  .dock {
+    padding: 0 var(--sp-5);
+  }
+
+  .topbar-actions {
+    gap: var(--sp-1);
+  }
+
+  .topbar-overlay-label {
+    display: none;
+  }
+
+  .page-header {
+    gap: var(--sp-3);
+  }
+
+  .page-header p {
+    max-width: 62ch;
+  }
+}
+
+/* 图标轨：极窄窗口（高 DPI 小屏 / 分屏）下侧栏只保留图标 */
+@media (max-width: 1080px) {
+  .sidebar {
+    width: 68px;
+    flex-basis: 68px;
+    padding: var(--sp-3) var(--sp-2);
+    gap: var(--sp-4);
+    align-items: center;
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .brand h1 {
+    display: none;
+  }
+
+  .nav {
+    align-items: center;
+    width: 100%;
+  }
+
+  .nav-item {
+    width: 40px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  /* 只隐藏导航文字，保留 LIVE / 未保存角标（下面改成圆点） */
+  .nav-item > span:not(.nav-live):not(.nav-dot) {
+    display: none;
+  }
+
+  .nav-item.active::before {
+    left: -8px;
+  }
+
+  .nav-live {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--danger);
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+  }
+
+  .nav-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+  }
+
+  /* 管理员状态在图标轨里保留为图标按钮：title / aria-label 承载全文 */
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .permission-chip {
+    width: var(--h-icon-button);
+    height: var(--h-icon-button);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .permission-chip span {
+    display: none;
+  }
+}
+
+/* 矮窗口：减少外壳与页面上下留白，卡片内边距由 --card-pad 一并收紧 */
+@media (max-height: 800px) {
+  :root {
+    --topbar-h: 44px;
+    --dock-h: 64px;
+    --page-pad-y: var(--sp-4);
+  }
+
+  .sidebar {
+    gap: var(--sp-4);
+    padding-top: var(--sp-3);
+  }
+
+  .page {
+    gap: var(--sp-4);
+    padding-bottom: var(--sp-8);
+  }
+
+  .page-header {
+    padding-top: 0;
+  }
+
+  .page-header p {
+    margin-top: var(--sp-1);
+  }
+
+  .topbar,
+  .dock {
+    padding-left: var(--page-pad-x);
+    padding-right: var(--page-pad-x);
+  }
+
+  .dock-divider {
+    height: 24px;
+  }
+}

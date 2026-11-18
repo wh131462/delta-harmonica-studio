@@ -1,0 +1,434 @@
+/* 智能导入页 · 页面专属结构（基元外观见 components.css） */
+
+/* 阶段序号：卡片标题前的步骤标记 */
+.import-step {
+  display: inline-grid;
+  place-items: center;
+  width: var(--sp-5);
+  height: var(--sp-5);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-3);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 卡片内容：标题行自带下边距，正文只负责纵向节奏 */
+.import-source-body,
+.import-params-body,
+.import-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.import-source-tabs {
+  margin-bottom: var(--sp-3);
+}
+
+/* ---------- 拖拽区（button 承载，键盘可达） ---------- */
+
+.import-dropzone {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-inset);
+  color: var(--text-2);
+  text-align: left;
+  transition:
+    border-color var(--dur-1) var(--ease-in-out),
+    background var(--dur-1) var(--ease-in-out),
+    color var(--dur-1) var(--ease-in-out);
+}
+
+.import-dropzone:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+/* 拖拽悬停：整块变亮 + 实线描边，明确「松手即导入」 */
+.import-dropzone.is-drag {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-1);
+}
+
+.import-dropzone:disabled {
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--text-4);
+}
+
+.import-dropzone__icon {
+  display: grid;
+  place-items: center;
+  width: var(--sp-8);
+  height: var(--sp-8);
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+.import-dropzone.is-drag .import-dropzone__icon {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.import-dropzone__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.import-dropzone__title {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.import-dropzone:disabled .import-dropzone__title {
+  color: var(--text-3);
+}
+
+.import-dropzone__hint {
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--text-3);
+}
+
+/* ---------- 已选文件 ---------- */
+
+.import-file {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-inset);
+  color: var(--text-3);
+}
+
+.import-file__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.import-file strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.import-file__text span {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- MIDI 音轨：紧凑单选行，不套卡片 ---------- */
+
+.import-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-tracks legend {
+  padding: 0;
+}
+
+.import-track {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: var(--h-control-sm);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-in-out),
+    border-color var(--dur-1) var(--ease-in-out);
+}
+
+.import-track:hover {
+  background: var(--surface-3);
+}
+
+.import-track.is-selected {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.import-track input {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.import-track__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-1);
+}
+
+.import-track__meta {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 简谱文本（次要入口） ---------- */
+
+.import-alt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.import-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.import-textarea {
+  min-height: calc(var(--sp-16) * 2.5);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+.import-diags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.import-diag {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.import-diag svg {
+  margin-top: var(--sp-1);
+}
+
+.import-diag--error {
+  color: var(--danger);
+}
+
+.import-diag--warning {
+  color: var(--warn);
+}
+
+.import-diag--info {
+  color: var(--text-3);
+}
+
+/* ---------- 参数分组 ---------- */
+
+.import-fieldgroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.import-fieldgroup + .import-fieldgroup {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+/* 让每个字段按内容折行，而不是被统一拉到底部对齐 */
+.import-fieldgroup .import-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3) var(--sp-4);
+  align-items: start;
+}
+
+.import-fieldgroup .field {
+  flex: none;
+  max-width: none;
+}
+
+/* 成对控件（音域上下限）不要拉满整行 */
+.import-fieldgroup .field-inline {
+  flex-wrap: wrap;
+}
+
+.import-fieldgroup .field-inline .select {
+  flex: 1 1 96px;
+  max-width: 150px;
+}
+
+/* ---------- 执行区（滚动参数时保持可见） ---------- */
+
+.import-run {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin: 0 calc(var(--card-pad) * -1) calc(var(--card-pad) * -1);
+  padding: var(--sp-3) var(--card-pad) var(--sp-4);
+  border-top: 1px solid var(--line-subtle);
+  background: var(--surface-2);
+  box-shadow: 0 -14px 24px -22px rgba(0, 0, 0, 0.9);
+  border-radius: 0 0 var(--r-panel) var(--r-panel);
+}
+
+.import-run__status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1 1 calc(var(--sp-16) * 4);
+  min-width: 0;
+}
+
+.import-run__stage {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-run__progress {
+  width: 100%;
+  max-width: calc(var(--sp-16) * 5);
+}
+
+/* ---------- 结果 ---------- */
+
+.import-result-summary {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.import-result-title {
+  flex: 1 1 calc(var(--sp-16) * 4);
+  max-width: calc(var(--sp-16) * 7);
+}
+
+.import-result-summary .chip-row {
+  flex: 1 1 calc(var(--sp-16) * 4);
+  min-width: 0;
+}
+
+.import-score {
+  max-height: calc(var(--sp-16) * 5);
+  overflow: auto;
+}
+
+/* 提示条内的提示列表：图标跟随语义色，文字保持高对比 */
+.import-result-body .notice--warn .fact-list {
+  margin-top: var(--sp-1);
+}
+
+.import-result-body .notice--warn .fact-list svg {
+  color: var(--warn);
+}
+
+.import-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--ok);
+}
+
+@media (max-width: 1180px) {
+  .import-fieldgroup .field {
+    max-width: none;
+  }
+
+  .import-result-title {
+    max-width: none;
+  }
+
+  /* 执行区回到文档流：窄窗口下吸底条会遮住参数 */
+  .import-run {
+    position: static;
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3) 0 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* 两列及以下：字段改用单列，避免每格被压到 200px 以下 */
+@media (max-width: 760px) {
+  .import-fieldgroup .import-field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .import-dropzone {
+    align-items: flex-start;
+  }
+
+  .import-dropzone__icon {
+    width: var(--sp-6);
+    height: var(--sp-6);
+  }
+
+  .import-result-summary {
+    align-items: stretch;
+  }
+
+  .import-result-title,
+  .import-result-summary .chip-row {
+    flex-basis: 100%;
+  }
+
+  .import-run {
+    gap: var(--sp-2);
+  }
+}
+
+/* 矮窗口：文本域与预览谱面收紧，参数区不把执行按钮挤出屏幕 */
+@media (max-height: 800px) {
+  .import-textarea {
+    min-height: calc(var(--sp-16) * 1.75);
+  }
+
+  .import-score {
+    max-height: calc(var(--sp-16) * 4);
+  }
+}

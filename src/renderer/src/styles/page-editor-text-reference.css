@@ -1,0 +1,252 @@
+/* 简谱编辑器 */
+
+.editor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 2.6fr) repeat(3, minmax(88px, 0.8fr)) minmax(132px, 1fr);
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+.syntax-help {
+  border-top: 1px solid var(--line-subtle);
+  padding-top: var(--sp-2);
+}
+
+.syntax-help summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  list-style: none;
+  user-select: none;
+}
+
+.syntax-help summary::-webkit-details-marker {
+  display: none;
+}
+
+.syntax-help summary::before {
+  content: '▸';
+  font-size: var(--fs-micro);
+  color: var(--text-4);
+  transition: transform var(--dur-1) var(--ease-in-out);
+}
+
+.syntax-help[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.syntax-help summary:hover {
+  color: var(--text-1);
+}
+
+.syntax-help p {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  line-height: 1.9;
+  color: var(--text-4);
+}
+
+.syntax-help code {
+  margin: 0 1px;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+
+.editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.editor-textarea {
+  flex: 1;
+  min-height: 260px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+  tab-size: 2;
+}
+
+.diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--line-subtle);
+}
+
+/* 提示可能很多（如长曲每个小节一条），限定高度内部滚动，避免把卡片撑高 */
+.diagnostics__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+  padding-right: var(--sp-1);
+}
+
+.diagnostics__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.diag {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.diag svg {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.diag-error {
+  color: var(--danger);
+}
+
+.diag-warning {
+  color: var(--warn);
+}
+
+.diag-info {
+  color: var(--text-3);
+}
+
+.diag-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--ok);
+}
+
+.diag-number {
+  color: var(--text-4);
+  font-family: var(--font-mono);
+}
+
+.editor-score {
+  flex: 1;
+  min-height: 200px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.inspector__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.inspector__label {
+  margin-bottom: 0;
+}
+
+.inspector__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(76px, 1fr));
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.quick-durations {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.quick-chip {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-inset);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--dur-1) var(--ease-in-out), border-color var(--dur-1) var(--ease-in-out);
+}
+
+.quick-chip:hover {
+  color: var(--text-1);
+  border-color: var(--line);
+}
+
+.quick-chip.active {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.editor-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+.editor-stats .sep {
+  color: var(--text-4);
+  opacity: 0.6;
+}
+
+@media (max-width: 1180px) {
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .meta-grid {
+    grid-template-columns: repeat(3, minmax(90px, 1fr));
+  }
+
+  .meta-grid > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .editor-textarea {
+    min-height: 320px;
+  }
+}

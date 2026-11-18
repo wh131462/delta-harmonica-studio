@@ -1,0 +1,144 @@
+/* =============================================================================
+   设计令牌 · Design tokens
+   唯一来源。组件与页面不得再写死颜色 / 字号 / 间距 / 圆角。
+   命名规则：--<类别>-<角色>-<强度>
+   ============================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------- 画布与表面（冷石墨，低饱和） ---------- */
+  --canvas: #07080b;          /* 窗口最底层 */
+  --canvas-elev: #0a0c11;     /* 页面滚动区背景 */
+  --surface-1: #0d1015;       /* 侧栏 / 播放条 */
+  --surface-2: #12161e;       /* 面板（卡片）*/
+  --surface-3: #171b24;       /* 次级按钮 / 内嵌块 */
+  --surface-4: #1c212b;       /* 悬停 */
+  --surface-5: #232935;       /* 按下 / 选中底 */
+  --surface-inset: #0b0e13;   /* 凹陷：输入框 / 谱面外框 / 分段控件底 */
+  --surface-veil: rgba(13, 16, 21, 0.82); /* 半透明层（顶栏/播放条） */
+
+  /* ---------- 描边 ---------- */
+  --line-subtle: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.085);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --line-focus: rgba(92, 200, 232, 0.6);
+
+  /* ---------- 文本 ---------- */
+  --text-1: #e9edf4;  /* 主文本，对比度 ≥ 12:1 */
+  --text-2: #a7b0bf;  /* 次文本，≥ 7:1 */
+  --text-3: #78828f;  /* 辅助文本，≥ 4.5:1 */
+  --text-4: #59616f;  /* 禁用 / 装饰 */
+  --text-on-accent: #1a1204;
+  --selection-text: #ffffff;
+
+  /* ---------- 主强调色：黄铜琥珀（聚光灯） ---------- */
+  --accent: #f2b64a;
+  --accent-hover: #ffc866;
+  --accent-press: #dda23a;
+  --accent-soft: rgba(242, 182, 74, 0.12);
+  --accent-line: rgba(242, 182, 74, 0.42);
+  --accent-glow: 0 10px 28px -10px rgba(242, 182, 74, 0.5);
+
+  /* ---------- 次强调色：信号青（只用于系统/输入通道/焦点） ---------- */
+  --signal: #5cc8e8;
+  --signal-soft: rgba(92, 200, 232, 0.12);
+  --signal-line: rgba(92, 200, 232, 0.4);
+  --focus: rgba(92, 200, 232, 0.75);
+
+  /* ---------- 语义色 ---------- */
+  --ok: #43d39e;
+  --ok-soft: rgba(67, 211, 158, 0.12);
+  --ok-line: rgba(67, 211, 158, 0.36);
+
+  --warn: #efb35c;
+  --warn-soft: rgba(239, 179, 92, 0.12);
+  --warn-line: rgba(239, 179, 92, 0.38);
+
+  --danger: #f4777a;
+  --danger-strong: #ff9496;
+  --danger-soft: rgba(244, 119, 122, 0.12);
+  --danger-line: rgba(244, 119, 122, 0.4);
+
+  /* ---------- 谱面专用（可被父容器覆盖） ---------- */
+  --paper: #16130f;
+  --paper-2: #1a1712;
+  --paper-ink: #f1e7d5;
+  --paper-ink-dim: #a89b86;
+  --paper-rest-ink: #cbbda6;
+  --paper-barline: #4c453b;
+  --paper-barline-strong: #b8a98f;
+  --paper-tie: #8d806c;
+
+  /* ---------- 字体 ---------- */
+  --font-sans: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+  /* 字号 / 行高 / 字重 */
+  --fs-display: 26px;   --lh-display: 1.2;  --fw-display: 640;
+  --fs-title: 17px;     --lh-title: 1.35;   --fw-title: 600;
+  --fs-subtitle: 14px;  --lh-subtitle: 1.45;--fw-subtitle: 600;
+  --fs-body: 13px;      --lh-body: 1.6;
+  --fs-lead: 12.5px;    --lh-lead: 1.55;
+  --fs-sm: 12px;        --lh-sm: 1.55;
+  --fs-xs: 11px;        --lh-xs: 1.45;
+  --fs-micro: 10px;     --lh-micro: 1.3;    --fw-micro: 600;
+  --fs-metric: 20px;    --lh-metric: 1.2;   --fw-metric: 600;
+
+  /* ---------- 间距（4pt 栅格） ---------- */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* ---------- 圆角 ---------- */
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-panel: 14px;
+  --r-full: 999px;
+
+  /* ---------- 阴影 / 高度 ---------- */
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --shadow-2: 0 18px 48px -24px rgba(0, 0, 0, 0.8);
+  --shadow-3: 0 36px 96px -32px rgba(0, 0, 0, 0.9);
+
+  /* ---------- 控件尺寸 ---------- */
+  --h-control: 34px;
+  --h-control-sm: 28px;
+  --h-control-lg: 40px;
+  --h-icon-button: 32px;
+
+  /* ---------- 动效 ---------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+
+  /* ---------- 层级 ---------- */
+  --z-dock: 20;
+  --z-popover: 80;
+  --z-overlay: 100;
+  --z-modal: 120;
+  --z-toast: 200;
+
+  /* ---------- 布局骨架 ---------- */
+  --sidebar-w: 232px;
+  --topbar-h: 48px;
+  --dock-h: 72px;
+  --page-max: 1160px;
+  --page-pad-x: 32px;
+  --page-pad-y: 28px;
+  --card-pad: var(--sp-5);   /* 卡片内边距；窄/矮窗口整体收紧时只改这一处 */
+}

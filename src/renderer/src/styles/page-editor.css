@@ -1,0 +1,291 @@
+/* 简谱编辑器（可视化音符序列版）
+   页面结构：曲谱信息卡 + 谱面编辑卡（音级键盘 / 八度 / 升降 / 时值 / 可点击谱面）。
+   只定义页面结构类；按钮、输入、分段控件等外观来自 components.css。 */
+
+/* ============================ 曲谱信息 ============================ */
+
+.score-meta__grid {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 2.4fr)
+    minmax(96px, 0.8fr)
+    minmax(112px, 0.9fr)
+    minmax(136px, 1fr)
+    minmax(96px, 0.8fr);
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+/* ============================ 编辑卡 ============================ */
+
+.score-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.score-editor > .card-title-row {
+  margin-bottom: 0;
+}
+
+/* 工具栏：三组输入设置，窄窗口自动换行 */
+.score-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line-subtle);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.tool-group .section-label {
+  margin-bottom: 0;
+}
+
+.tool-group--grow {
+  flex: 1 1 300px;
+}
+
+/* ---------- 音级键盘 ---------- */
+
+.note-pad {
+  display: flex;
+  gap: var(--sp-1);
+}
+
+.note-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: var(--h-control-lg);
+  height: calc(var(--h-control-lg) + var(--sp-1));
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-inset);
+  color: var(--text-1);
+  line-height: 1;
+  transition:
+    background var(--dur-1) var(--ease-in-out),
+    border-color var(--dur-1) var(--ease-in-out),
+    color var(--dur-1) var(--ease-in-out);
+}
+
+.note-key:hover {
+  background: var(--surface-4);
+  border-color: var(--line-strong);
+}
+
+.note-key.is-active {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.note-key__name {
+  font-size: var(--fs-title);
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.note-key__solfege {
+  font-size: var(--fs-micro);
+  line-height: 1.1;
+  color: var(--text-3);
+}
+
+.note-key.is-active .note-key__solfege {
+  color: var(--accent);
+}
+
+.note-key--rest {
+  margin-left: var(--sp-2);
+}
+
+/* ---------- 八度 / 升降 ---------- */
+
+.score-editor__octave {
+  width: 112px;
+}
+
+.score-editor__accidental .segmented__item {
+  min-width: 34px;
+  padding: 0;
+  font-size: var(--fs-body);
+}
+
+/* ---------- 时值 ---------- */
+
+.duration-pad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.duration-key {
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.duration-key__beats {
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+}
+
+/* ---------- 选中信息 + 操作 ---------- */
+
+.score-editor__selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  min-height: 28px;
+}
+
+.score-editor__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.score-editor__status svg {
+  color: var(--text-3);
+}
+
+.score-editor__status b {
+  color: var(--text-1);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* ---------- 纸面 ---------- */
+
+.score-editor__paper {
+  max-height: 284px;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  scrollbar-gutter: stable;
+}
+
+/* ---------- 空状态 ---------- */
+
+.score-editor__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
+}
+
+.score-editor__empty-icon {
+  display: grid;
+  place-items: center;
+  width: var(--h-control-lg);
+  height: var(--h-control-lg);
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+.score-editor__empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.score-editor__empty-text strong {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.score-editor__empty-text p {
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* ============================ 窄窗口 / 矮窗口 ============================ */
+
+@media (max-width: 1180px) {
+  .score-meta__grid {
+    grid-template-columns: repeat(4, minmax(90px, 1fr));
+  }
+
+  .score-meta__grid > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1120px) {
+  .score-editor__toolbar {
+    gap: var(--sp-3) var(--sp-4);
+  }
+}
+
+@media (max-width: 860px) {
+  .score-meta__grid {
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
+  }
+
+  .score-editor__paper {
+    max-height: 280px;
+  }
+}
+
+@media (max-width: 760px) {
+  .score-meta__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .note-pad {
+    flex-wrap: wrap;
+  }
+
+  .score-editor__empty {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 矮窗口：纸面 / 工具栏收紧，尽量让编辑卡一屏内完成主要动作 */
+@media (max-height: 800px) {
+  .score-editor__paper {
+    max-height: 220px;
+  }
+
+  .score-editor__toolbar {
+    padding: var(--sp-2) 0;
+  }
+}

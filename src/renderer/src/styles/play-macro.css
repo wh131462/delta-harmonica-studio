@@ -1,118 +1,179 @@
 /* ============================================================
-   演奏台 · 鼠标宏 / 触发键位表（页面级样式）
-   规范：颜色/圆角/阴影只用 :root 令牌；琥珀色只用于「当前选中」；
-   本面板所有导出按钮均为 secondary/quiet，全应用唯一主操作仍是底部播放条「开始演奏」。
+   演奏台 · 宏导出 / 触发键位表（页面级样式，类名统一 macro- 前缀）
+   ------------------------------------------------------------
+   - 颜色 / 字号 / 间距 / 圆角只用 tokens.css 的令牌
+   - 本面板没有主操作：导出按钮一律次级，唯一的实心琥珀按钮属于底部播放条
+   - 保留 .macro-* 语义：面板容器 / 动作行 / 预览 / 分组标题 / 数据表
    ============================================================ */
 
 .macro-panel {
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
 }
 
 .macro-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
-/* 预览格式切换：仅当前项使用琥珀强调，符合「强调色预算」 */
-.macro-preview-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-soft);
-  border: 1px solid var(--line);
-}
-
-.macro-preview-tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-faint);
-  font-size: 11px;
-  padding: 6px 8px;
-  border-radius: 7px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
-}
-
-.macro-preview-tab:hover {
-  color: var(--text);
-}
-
-.macro-preview-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.macro-preview-tab.active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-/* 代码预览：数据展示区，不是嵌套卡片 */
+/* 代码预览：只读数据块，固定高度避免切换格式时面板跳动 */
 .macro-preview {
   flex: 0 0 auto;
   height: 220px;
-  overflow: auto;
   margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: var(--bg-soft);
-  color: var(--text);
-  font-size: 10.5px;
-  line-height: 1.55;
+  padding: var(--sp-3);
+  overflow: auto;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-inset);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
   white-space: pre;
 }
 
+/* 表格分组标题：与 .section-label 同级，右侧带数量 */
 .macro-section-title {
-  font-size: 12px;
-  color: var(--text-dim);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-xs);
   font-weight: 600;
-  margin: 4px 0 0;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
 }
 
-/* 触发表：可滚动数据网格 */
+.macro-section-count {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-micro);
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+}
+
+/* 触发表：可滚动数据网格，表头吸顶 */
 .macro-table-wrap {
   flex: 0 0 auto;
-  height: 220px;
+  max-height: 240px;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
 }
 
 .macro-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .macro-table th {
   position: sticky;
   top: 0;
-  background: var(--panel);
-  color: var(--text-faint);
-  text-align: left;
-  padding: 5px 8px;
-  font-weight: 600;
+  padding: var(--sp-1) var(--sp-2);
   border-bottom: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-weight: 600;
+  text-align: left;
   white-space: nowrap;
 }
 
 .macro-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--line);
-  color: var(--text-dim);
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--line-subtle);
+  color: var(--text-2);
   white-space: nowrap;
 }
 
-.macro-table tr:hover td {
-  background: var(--panel-hover);
+.macro-table tbody tr:hover td {
+  background: var(--surface-3);
 }
 
 .macro-table code {
-  font-family: var(--mono);
-  color: var(--accent-strong);
+  color: var(--text-1);
+}
+
+/* 宏软件兼容性：折叠说明，避免在窄侧栏常驻一张大表 */
+.macro-compat {
+  min-width: 0;
+}
+
+.macro-compat > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.macro-compat > summary::-webkit-details-marker {
+  display: none;
+}
+
+.macro-compat > summary::before {
+  content: '▸';
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  transition: transform var(--dur-1) var(--ease-in-out);
+}
+
+.macro-compat[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.macro-compat > summary:hover {
+  color: var(--text-1);
+}
+
+.macro-compat__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-3);
+  list-style: none;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
+}
+
+.macro-compat__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.macro-compat__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.macro-compat__software {
+  font-size: var(--fs-xs);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+.macro-compat__body {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-3);
+}
+
+.macro-compat__body b {
+  font-weight: 600;
+  color: var(--text-2);
 }

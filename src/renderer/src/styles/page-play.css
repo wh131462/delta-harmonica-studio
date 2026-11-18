@@ -1,0 +1,279 @@
+/* ============================================================
+   演奏台 · 页面级样式（类名统一 play- 前缀）
+   ------------------------------------------------------------
+   只做版面与页面结构；颜色 / 字号 / 间距 / 圆角全部来自 tokens.css，
+   控件外观来自 components.css 的基元（.card / .chip / .tabs / .btn …）。
+   ============================================================ */
+
+/* ---------------- 版面：主区（曲谱）+ 右栏（面板） ---------------- */
+
+.play-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
+  gap: var(--sp-5);
+  align-items: start;
+}
+
+/* ---------------- 主区：曲谱概览 ---------------- */
+
+.play-score-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.play-score-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.play-score-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.play-score-name {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: var(--fw-title);
+  color: var(--text-1);
+}
+
+.play-score-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+
+.play-score-artist {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-3);
+}
+
+/* 谱面：暖黑纸面 + 自身滚动，长曲不把页面撑高；高度跟随窗口，矮窗口自动让位给下方面板 */
+.play-score {
+  flex: 0 0 auto;
+  max-height: clamp(280px, 42vh, 420px);
+  overflow: auto;
+}
+
+/* 已选中的音符：谱面下方一行说明 + 取消选中 */
+.play-note-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.play-note-pick__text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* 演奏进度：进度条 + 时间码 */
+.play-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* 迁移期旧样式给 .progress 留了 margin-top，这里在本页布局里复位 */
+.play-status .progress {
+  margin-top: 0;
+}
+
+.play-status__time {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* 倒计时：开始前给用户切回游戏的时间 */
+.play-countdown {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: var(--fs-sm);
+}
+
+.play-countdown__hint {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+/* ---------------- 右栏：设置面板 ---------------- */
+
+.play-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.play-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  max-height: calc(100vh - var(--topbar-h) - var(--dock-h) - 260px);
+  overflow-y: auto;
+  padding-right: var(--sp-1);
+  border-radius: var(--r-sm);
+}
+
+/* 安全确认复选：紧跟警示说明 */
+.play-safety {
+  margin-top: var(--sp-2);
+}
+
+/* 演奏参数：短字段两列并排，避免右栏被撑出一屏 */
+.play-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+/* 页面内开始入口：降级为 .btn--primary，与播放条 / 全局热键同一动作 */
+.play-start {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.play-start__hint {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* 演奏计划提醒列表 */
+.play-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.play-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--warn);
+}
+
+.play-warning svg {
+  margin-top: 2px;
+}
+
+/* 宏预览格式切换：按内容宽度排布，不拉满整栏 */
+.play-format-switch {
+  align-self: flex-start;
+}
+
+/* 键位谱文本块：只读数据，固定在面板内滚动 */
+.play-keysheet {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
+  overflow: hidden;
+}
+
+.play-keysheet__text {
+  max-height: 260px;
+  margin: 0;
+  padding: var(--sp-3);
+  overflow: auto;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 页面头曲谱选择器：与 .btn--sm 同高，长标题不把工具栏撑宽 */
+.play-score-select {
+  max-width: 220px;
+}
+
+/* ---------------- 窄窗口：右栏下移，面板不再限高 ---------------- */
+
+@media (max-width: 1180px) {
+  .play-page .play-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .play-page .play-panel__body {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .play-page .play-score {
+    max-height: clamp(240px, 36vh, 360px);
+  }
+
+  /* 单列后卡片占满整行：表单控件保持可读宽度，不跟着卡片拉成 800px 长条 */
+  .play-page .play-panel__body .field > .select,
+  .play-page .play-panel__body .field > .input,
+  .play-page .play-panel__body .field-inline {
+    max-width: 420px;
+  }
+
+  /* 目标窗口：输入框 + 两个图标按钮可以略宽 */
+  .play-page .play-panel__body .field > .field-inline {
+    max-width: 516px;
+  }
+
+  .play-page .play-panel__body .field-inline .btn {
+    flex: 0 0 auto;
+  }
+}
+
+/* 矮窗口：预览 / 键位谱固定高度跟着收紧，避免把面板撑出屏幕 */
+@media (max-height: 800px) {
+  .play-score {
+    max-height: 300px;
+  }
+
+  .play-keysheet__text {
+    max-height: 200px;
+  }
+
+  .macro-preview {
+    height: 176px;
+  }
+}

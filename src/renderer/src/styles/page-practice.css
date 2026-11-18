@@ -1,0 +1,850 @@
+/* ============================================================
+   练习 · 页面级样式
+   ------------------------------------------------------------
+   只做版面与练习轨道结构；颜色 / 字号 / 间距 / 圆角全部来自 tokens.css，
+   控件外观来自 components.css 的基元（.card / .btn / .badge / .field …）。
+   ============================================================ */
+
+/* ---------------- 版面：轨道 + 右栏（设置 / 成绩） ---------------- */
+
+.practice-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.62fr);
+  gap: var(--sp-5);
+  align-items: start;
+}
+
+.practice-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.practice-board,
+.practice-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.practice-config .card-title-row {
+  margin-bottom: 0;
+}
+
+/* ---------------- 顶部读数 ---------------- */
+
+.practice-hud {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+
+.practice-metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 62px;
+}
+
+.practice-metric__value {
+  font-family: var(--font-display);
+  font-size: var(--fs-metric);
+  line-height: var(--lh-metric);
+  font-weight: var(--fw-metric);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-metric__label {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.practice-hud__status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.practice-hud__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.practice-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.practice-progress .progress {
+  margin-top: 0;
+}
+
+.practice-progress__time {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ---------------- 轨道 ---------------- */
+
+.practice-lane {
+  position: relative;
+  height: clamp(240px, 32vh, 360px);
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-inset);
+  user-select: none;
+}
+
+/* 判定线左侧是已判定的区域；不加遮罩，避免盖住刚判定的音 */
+
+.practice-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  will-change: transform;
+  transform: translate3d(var(--hit-x, 140px), 0, 0);
+}
+
+/* 预备区：单独铺拍点，避免与正式小节线错位 */
+.practice-track__countin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background-color: var(--surface-1);
+  background-image: linear-gradient(90deg, var(--line-subtle) 0 1px, transparent 1px);
+  background-size: var(--beat-w, 72px) 100%;
+  background-repeat: repeat-x;
+  border-right: 1px solid var(--line);
+}
+
+/* 正式段落：小节线 + 拍点，随轨道一起平移 */
+.practice-track__bars {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(90deg, var(--line) 0 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-subtle) 0 1px, transparent 1px);
+  background-size:
+    var(--bar-w, 288px) 100%,
+    var(--beat-w, 72px) 100%;
+  background-repeat: repeat-x;
+}
+
+.practice-bar-label {
+  position: absolute;
+  top: var(--sp-2);
+  transform: translateX(4px);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+/* 音符：头固定在拍点上，尾表示时值；尾在下层，不会盖住后面的音头 */
+.practice-note {
+  position: absolute;
+  top: 50%;
+  height: 58px;
+  transform: translateY(-50%);
+  transition: opacity var(--dur-2) var(--ease-in-out);
+}
+
+.practice-note__tail {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 0;
+  height: 7px;
+  transform: translateY(-50%);
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: var(--surface-4);
+}
+
+.practice-note__head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 100%;
+  padding: 0 var(--sp-1);
+  transform: translateX(-50%);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text-1);
+  transition:
+    border-color var(--dur-2) var(--ease-in-out),
+    background var(--dur-2) var(--ease-in-out);
+}
+
+.practice-note__digit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-metric);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.practice-note__dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fs-micro);
+  line-height: 1;
+  letter-spacing: 0.14em;
+  color: var(--text-2);
+}
+
+.practice-note__dots--up {
+  bottom: 100%;
+  margin-bottom: 1px;
+}
+
+.practice-note__dots--down {
+  top: 100%;
+  margin-top: 1px;
+}
+
+.practice-note__keys {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* 密集音符：音头收窄到不相撞，必要时只留音级数字 */
+.practice-note.is-compact .practice-note__head {
+  padding: 0 2px;
+}
+
+.practice-note.is-compact .practice-note__keys {
+  display: none;
+}
+
+.practice-note.is-compact .practice-note__digit {
+  font-size: var(--fs-sm);
+}
+
+.practice-note[data-grade] {
+  opacity: 0.18;
+}
+
+.practice-note[data-grade='miss'] {
+  opacity: 0.6;
+}
+
+.practice-note[data-grade='miss'] .practice-note__head {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.practice-note[data-grade='miss'] .practice-note__tail {
+  background: var(--danger-line);
+}
+
+.practice-note.is-target .practice-note__head {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.practice-note.is-target .practice-note__tail {
+  background: var(--accent-soft);
+}
+
+.practice-note.is-target .practice-note__digit {
+  color: var(--accent-hover);
+}
+
+/* 判定线：整条轨道上唯一的琥珀竖线；放在音符下层，不切过音级数字 */
+.practice-hitline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--hit-x, 140px);
+  z-index: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--accent-line) 12%,
+    var(--accent) 50%,
+    var(--accent-line) 88%,
+    transparent
+  );
+  box-shadow: 0 0 16px var(--accent-soft);
+  pointer-events: none;
+}
+
+/* 判定反馈：放在轨道下方单独一行，不再盖住谱面 */
+.practice-feedback-row {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.practice-feedback {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  animation: practice-feedback-in var(--dur-1) var(--ease-out);
+}
+
+.practice-feedback strong {
+  font-family: var(--font-display);
+  font-size: var(--fs-subtitle);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.practice-feedback__delta {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.practice-feedback__expected {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.practice-feedback[data-grade='perfect'] strong {
+  color: var(--accent);
+}
+
+.practice-feedback[data-grade='great'] strong {
+  color: var(--ok);
+}
+
+.practice-feedback[data-grade='good'] strong {
+  color: var(--text-1);
+}
+
+.practice-feedback[data-grade='miss'] strong {
+  color: var(--danger);
+}
+
+.practice-feedback[data-grade='wrong'] strong {
+  color: var(--warn);
+}
+
+@keyframes practice-feedback-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 待开始 / 暂停 / 完成时盖住轨道，状态只说一次 */
+.practice-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6);
+  text-align: center;
+  background: var(--surface-veil);
+  backdrop-filter: blur(3px);
+}
+
+.practice-veil__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.practice-veil__text {
+  max-width: 460px;
+  font-size: var(--fs-sm);
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.practice-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+}
+
+/* ---------------- 设置面板 ---------------- */
+
+.practice-range {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.practice-range .select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.practice-range__sep {
+  color: var(--text-4);
+}
+
+.practice-speed {
+  width: 100%;
+}
+
+.practice-value {
+  color: var(--text-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-score-select {
+  max-width: 220px;
+}
+
+/* ---------------- 成绩（跟在轨道下面，不另占一栏） ---------------- */
+
+.practice-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  flex-wrap: wrap;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.practice-summary__label {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-micro);
+  letter-spacing: 0.12em;
+  color: var(--text-4);
+}
+
+.practice-summary__grades {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.practice-summary__grade {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.practice-summary__grade::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--grade-color, var(--text-3));
+  transform: translateY(-1px);
+}
+
+.practice-summary__grade b {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.practice-summary__grade[data-grade='perfect'] {
+  --grade-color: var(--accent);
+}
+
+.practice-summary__grade[data-grade='great'] {
+  --grade-color: var(--ok);
+}
+
+.practice-summary__grade[data-grade='good'] {
+  --grade-color: var(--text-2);
+}
+
+.practice-summary__grade[data-grade='miss'] {
+  --grade-color: var(--danger);
+}
+
+.practice-summary__grade[data-grade='wrong'] {
+  --grade-color: var(--warn);
+}
+
+.practice-summary__meta {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.practice-summary__meta b {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-start-hint {
+  color: var(--text-2);
+}
+
+/* ---------------- 下落式轨道 ---------------- */
+
+/* 轨道容器：时间向上增长，整条轨道向下平移，音符因此朝判定线落下 */
+.practice-track--fall {
+  right: 0;
+  bottom: auto;
+  height: 0;
+}
+
+.practice-fall-board {
+  position: absolute;
+  top: 0;
+  height: 0;
+}
+
+/* 音键列：与物理键位一一对应，只做底纹，不参与判定 */
+.practice-fall-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  pointer-events: none;
+}
+
+.practice-fall-column {
+  border-left: 1px solid var(--line-subtle);
+}
+
+.practice-fall-column:last-child {
+  border-right: 1px solid var(--line-subtle);
+}
+
+/* 判定线下方的"已过"区域：盖住已经落下的音，只留判定线附近 */
+.practice-fall-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid var(--line-subtle);
+  background: var(--surface-inset);
+  pointer-events: none;
+}
+
+.practice-fall-hitline {
+  position: absolute;
+  z-index: 3;
+  height: 2px;
+  margin-top: -1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-line) 8%,
+    var(--accent) 50%,
+    var(--accent-line) 92%,
+    transparent
+  );
+  box-shadow: 0 0 16px var(--accent-soft);
+  pointer-events: none;
+}
+
+.practice-fall-keys {
+  position: absolute;
+  bottom: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: center;
+  height: var(--sp-10);
+  pointer-events: none;
+}
+
+.practice-fall-key {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* 预备区与正式段落：与横向轨道共用同一份时间轴，只是旋转了 90° */
+.practice-fall-countin {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background-color: var(--surface-1);
+  background-image: linear-gradient(180deg, var(--line-subtle) 0 1px, transparent 1px);
+  background-size: 100% var(--beat-h, 56px);
+}
+
+.practice-fall-bars {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background-image:
+    linear-gradient(180deg, var(--line) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--line-subtle) 0 1px, transparent 1px);
+  background-size:
+    100% var(--bar-h, 224px),
+    100% var(--beat-h, 56px);
+  border-bottom: 1px solid var(--line);
+}
+
+.practice-bar-label--fall {
+  top: 0;
+  right: 100%;
+  left: auto;
+  margin-right: var(--sp-2);
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+/* 音符：上下位置表示时间，左右位置表示该按哪个音键 */
+.practice-fall-note {
+  position: absolute;
+  z-index: 1;
+  transform: translateX(-50%);
+  transition: opacity var(--dur-2) var(--ease-in-out);
+}
+
+.practice-fall-note__tail {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 0;
+  width: 7px;
+  transform: translateX(-50%);
+  border-radius: var(--r-full);
+  background: var(--surface-4);
+}
+
+.practice-fall-note__face {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text-1);
+  transition:
+    border-color var(--dur-2) var(--ease-in-out),
+    background var(--dur-2) var(--ease-in-out);
+}
+
+.practice-fall-note__pitch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.practice-fall-note__digit {
+  font-family: var(--font-display);
+  font-size: var(--fs-metric);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.practice-fall-note.is-compact .practice-fall-note__digit {
+  font-size: var(--fs-sm);
+}
+
+.practice-fall-note__dots {
+  font-size: var(--fs-micro);
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--text-2);
+}
+
+.practice-fall-note__keys {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.practice-fall-note[data-grade] {
+  opacity: 0.18;
+}
+
+.practice-fall-note[data-grade='miss'] {
+  opacity: 0.6;
+}
+
+.practice-fall-note[data-grade='miss'] .practice-fall-note__face {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.practice-fall-note[data-grade='miss'] .practice-fall-note__tail {
+  background: var(--danger-line);
+}
+
+.practice-fall-note.is-target .practice-fall-note__face {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.practice-fall-note.is-target .practice-fall-note__tail {
+  background: var(--accent-soft);
+}
+
+.practice-fall-note.is-target .practice-fall-note__digit {
+  color: var(--accent-hover);
+}
+
+/* ---------------- 窄窗口：轨道在上，设置在下 ---------------- */
+
+@media (max-width: 1180px) {
+  .practice-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .practice-hud {
+    gap: var(--sp-3) var(--sp-5);
+  }
+
+  /* 设置卡占满整行后，控件保持可读宽度；滑杆仍可拉长便于微调 */
+  .practice-config .field > .select {
+    max-width: 420px;
+  }
+
+  .practice-config .practice-range {
+    max-width: 640px;
+  }
+
+  .practice-config .practice-range .select {
+    flex: 0 1 260px;
+    max-width: 260px;
+  }
+
+  .practice-config .practice-speed {
+    max-width: 640px;
+  }
+}
+
+/* ---------------- 矮窗口：轨道让出一部分高度给设置 ---------------- */
+
+@media (max-height: 800px) {
+  .practice-lane {
+    height: clamp(200px, 30vh, 320px);
+  }
+
+  .practice-summary {
+    padding-top: var(--sp-2);
+  }
+}
+
+/* ---------------- 全屏练习 ---------------- */
+
+body.practice-focusing {
+  overflow: hidden;
+}
+
+/* 全屏时收起外壳与页面头，Tab 只会落在练习区 */
+body.practice-focusing .sidebar,
+body.practice-focusing .topbar,
+body.practice-focusing .dock,
+body.practice-focusing .skip-link,
+.practice-page.is-focus .page-header {
+  display: none;
+}
+
+body.practice-focusing .page-scroll {
+  overflow: hidden;
+}
+
+.practice-page.is-focus {
+  max-width: none;
+  padding: 0;
+}
+
+.practice-stage.is-focus {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: var(--canvas);
+}
+
+.practice-stage.is-focus .practice-side {
+  display: none;
+}
+
+.practice-stage.is-focus .practice-board {
+  flex: 1;
+  min-height: 0;
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.practice-stage.is-focus .practice-lane {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 180px;
+}
+
+.practice-focus-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-control-sm);
+  padding: 0 var(--sp-1);
+}
+
+.practice-focus-bar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.practice-focus-bar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
