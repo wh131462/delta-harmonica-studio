@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     pitchMax: 84,
     minNoteMs: 70,
     suppressAccompaniment: true,
+    melodyDensity: 'normal',
   },
   hotkeys: {
     togglePlay: 'F9',
@@ -44,6 +45,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preview: {
     instrument: 'harmonica',
     volume: 0.55,
+  },
+  practice: {
+    speed: 0.8,
+    mode: 'timing',
+    loop: false,
+    metronome: true,
+    hitSound: true,
+    noteStyle: 'scroll',
   },
 };
 
@@ -65,10 +74,17 @@ export function mergeSettings(base: AppSettings, patch: Partial<AppSettings>): A
       position: patch.overlay && 'position' in patch.overlay ? patch.overlay.position ?? null : base.overlay.position,
     },
     preview: { ...base.preview, ...(patch.preview ?? {}) },
+    practice: { ...base.practice, ...(patch.practice ?? {}) },
   };
 }
 
 export function describeInputReadiness(check: InputCheck): { level: 'ok' | 'warn' | 'error'; message: string } {
+  if (!check.gameInjection) {
+    return {
+      level: 'warn',
+      message: '当前平台不支持游戏注入：编辑、导入、练习、试听与宏导出可用，演奏以排练模式运行',
+    };
+  }
   const elevatedIssue = check.notes.find((note) => note.includes('管理员'));
   if (!check.elevated) {
     return { level: 'warn', message: '未以管理员身份运行：向游戏注入按键可能被 Windows UIPI 静默拦截' };

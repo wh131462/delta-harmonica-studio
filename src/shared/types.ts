@@ -4,6 +4,9 @@
  */
 import type { Score } from '@core/model/score';
 import type { InputEvent } from '@core/instrument/plan';
+import type { PracticeMode } from '@core/practice/session';
+import type { MelodyDensity } from '@core/music/melody-simplify';
+import type { PlatformCapabilities } from './platform';
 
 export type InputBackend = 'software' | 'serial' | 'dry-run';
 
@@ -41,6 +44,25 @@ export interface PreviewSettings {
   instrument: PreviewInstrument;
   /** 0..1 */
   volume: number;
+}
+
+/** 练习谱面显示方式：横向滚动 / 下落式 */
+export type PracticeNoteStyle = 'scroll' | 'fall';
+
+/** 练习模式偏好（段落随曲谱变化，不持久化） */
+export interface PracticeSettings {
+  /** 速度倍率：0.5–1.25（核心会把越界值夹回来） */
+  speed: number;
+  /** timing = 计时判定；wait = 等按对才继续 */
+  mode: PracticeMode;
+  /** 练完一段自动循环 */
+  loop: boolean;
+  /** 节拍器 */
+  metronome: boolean;
+  /** 按键发声（含失误低声提示） */
+  hitSound: boolean;
+  /** 谱面显示：横向滚动或按音键分列下落 */
+  noteStyle: PracticeNoteStyle;
 }
 
 /** 可配置全局快捷键（Electron accelerator 字符串，例如 F9、CommandOrControl+Alt+P） */
@@ -91,6 +113,11 @@ export interface AudioAnalysisSettings {
   minNoteMs: number;
   /** 是否做 HPSS 伴奏抑制（带伴奏歌曲推荐开启） */
   suppressAccompaniment: boolean;
+  /**
+   * 音频谱面密度：宽松（每拍最多 1 个音）/ 标准（每拍最多 2 个音）/ 精细（保留 1/16 细节）。
+   * 只影响音频转谱的“可演奏化”精简，不改变原始旋律提取。
+   */
+  melodyDensity: MelodyDensity;
 }
 
 export interface AppSettings {
@@ -105,6 +132,7 @@ export interface AppSettings {
   hotkeys: HotkeySettings;
   overlay: OverlaySettings;
   preview: PreviewSettings;
+  practice: PracticeSettings;
 }
 
 export interface AppInfo {
@@ -113,6 +141,10 @@ export interface AppInfo {
   chromeVersion: string;
   nodeVersion: string;
   platform: string;
+  /** CPU 架构（x64 / arm64），用于区分 macOS Apple Silicon 与 Intel 构建 */
+  arch: string;
+  /** 平台能力：游戏注入仅 Windows 可用 */
+  capabilities: PlatformCapabilities;
   /** 当前进程是否为管理员（注入游戏必需） */
   elevated: boolean;
   userDataPath: string;
@@ -170,6 +202,7 @@ export type ExportFormat =
   | 'keys'
   | 'txt'
   | 'macro-ahk'
+  | 'macro-ahk2'
   | 'macro-lua'
   | 'macro-csv'
   | 'trigger-table';
@@ -209,6 +242,10 @@ export interface PlaybackStatus {
 
 export interface InputCheck {
   elevated: boolean;
+  /** 归一化前的 process.platform（win32 / darwin / linux） */
+  platform: string;
+  /** 当前平台是否支持向游戏注入键鼠 */
+  gameInjection: boolean;
   backend: InputBackend;
   helperAvailable: boolean;
   helperPath: string | null;
@@ -258,6 +295,10 @@ export interface RendererApi {
   files: {
     pick(filters: Array<{ name: string; extensions: string[] }>): Promise<PickedFile[]>;
     save(request: SaveFileRequest): Promise<string | null>;
+  };
+  samples: {
+    /** 读取随应用分发的真实音源采样（resources/audio-samples 下的白名单文件） */
+    read(file: string): Promise<Uint8Array>;
   };
   playback: {
     start(request: PlaybackRequest): Promise<StartPlaybackResult>;
