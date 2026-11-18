@@ -114,7 +114,9 @@ npm run dist:linux   # Linux：AppImage + deb（默认当前架构）
 
 ### CI（`.github/workflows/ci.yml`）
 
-- 矩阵：`windows-latest`、`macos-latest`、`ubuntu-latest`
+- 矩阵：`windows-latest`、`macos-15-intel`、`ubuntu-latest`
+- macOS 用 Intel 镜像：`macos-latest` 从 2025-08 起已是 macOS 15 arm64，而 GitHub 托管 arm64 机池在 2026-10 之后长期容量不足，job 会排队约 15 分钟后被取消（`The job was not acquired by Runner of type hosted even after multiple attempts`，一个 step 都不会跑）。`macos-13` 已于 2025-12-04 退役，`macos-15-intel` 是当前的 x86_64 镜像（2027-08 退役）。
+- PR 事件会跳过 macOS 腿（避免容量问题让 PR 恒红）；推送到 `master` / 手动触发时仍然三端全跑。
 - 步骤：`npm ci` → `npm run typecheck` → `npm test` → `npm run build` → `npm run dist:dir`
 - 三端都执行未打包目录构建，提前暴露 electron-builder 的平台配置错误；失败时上传 `out/` 与 `release/` 便于排查。
 
@@ -126,7 +128,7 @@ npm run dist:linux   # Linux：AppImage + deb（默认当前架构）
   | 名称 | Runner | 参数 | 产物 |
   |---|---|---|---|
   | windows-x64 | `windows-latest` | `--win --x64` | `*.exe`（NSIS + portable） |
-  | macos-x64-and-arm64 | `macos-latest` | `--mac --x64 --arm64` | `*.dmg` / `*.zip`（两种架构） |
+  | macos-x64-and-arm64 | `macos-15-intel` | `--mac --x64 --arm64` | `*.dmg` / `*.zip`（两种架构） |
   | linux-x64 | `ubuntu-latest` | `--linux --x64` | `*.AppImage` / `*.deb` |
 
 - `prepare` 作业先解析版本号（显式输入 → tag 名 → 提交信息规则 `feat: vX.Y.Z` → `package.json`）并用 `scripts/release-notes.mjs` 生成发布描述，三端构建统一采用该版本号。

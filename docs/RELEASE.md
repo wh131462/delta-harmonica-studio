@@ -118,6 +118,30 @@ node scripts/release-notes.mjs --rules ./my-rules.json --out notes.md
 - macOS 未做开发者签名与公证，仅对 Apple Silicon 产物做 ad-hoc 签名（`scripts/after-pack.cjs`），否则系统会直接判定为「已损坏」。首次打开需要用户按描述里的「macOS 首次打开放行」操作。
 - 仓库不需要配置任何签名相关 Secret；后续若要接入证书，重新引入 `CSC_LINK` / `CSC_KEY_PASSWORD` 并在 `electron-builder.yml` 里配置 `mac.notarize` 即可。
 
+## 已知基础设施问题
+
+GitHub 托管 macOS runner 的容量问题（2026-10 起）会让 job 在**没有执行任何 step** 的情况下被取消：
+
+```
+The job was not acquired by Runner of type hosted even after multiple attempts
+Internal server error. Correlation ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+判断依据：job 没有 runner、`steps` 为空、排队约 15 分钟后结束——这不是配置或代码问题，重跑（`Re-run failed jobs`）通常即可。当前规避措施：
+
+- CI 与 Release 的 macOS 腿都用 Intel 镜像 `macos-15-intel`（`macos-latest` 已是 arm64，机池更紧张；`macos-13` 已退役）。
+- CI 的 macOS 腿在 `pull_request` 事件上跳过，只在推送 `master` 与手动触发时校验。
+- 两个工作流都设了 `timeout-minutes`，避免异常时占用默认 360 分钟。
+
+若仍频繁遇到，可进一步：把 macOS 构建改为只在 Release 里执行、或提交 GitHub Support 工单（附上面的 Correlation ID）。
+
+### Package 步骤失败（二进制下载）
+
+`Package` 步骤失败时，先看日志里 `⨯` 开头那一行的下载 URL：
+
+- `ETIMEDOUT` / `Timeout awaiting 'request'` → 下载源不通。仓库 `.npmrc` 把 Electron 与 electron-builder 的二进制指向了 npmmirror（供国内本地开发），但托管 runner 走官方源更稳；`release.yml` / `ci.yml` 已用 `NPM_CONFIG_ELECTRON_MIRROR`、`NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR` 在 CI 里强制切到官方 release（electron-builder 的读取优先级是 `NPM_CONFIG_*` > `ELECTRON_BUILDER_BINARIES_MIRROR`）。
+- 安装包目标（nsis / portable / AppImage / dmg）比 `--dir` 多需要 electron-builder-binaries 里的工具；镜像缺文件时会在这里失败，而 `npm run dist:dir` 仍然通过——这也是「CI 绿、Release 红」的典型原因。
+
 ## 本地预览
 
 ```bash
