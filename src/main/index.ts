@@ -1,17 +1,18 @@
 /**
  * Electron 主进程入口：窗口、悬浮控制窗、全局快捷键、托盘、存储、演奏排程与截图模式。
  */
-import { BrowserWindow, Menu, app } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import { existsSync, promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { PlaybackController } from './playback-controller';
 import { AppStorage } from './storage';
 import { registerIpcHandlers } from './ipc';
-import { getWin32Bridge } from './native/win32';
+import { getNativeBridge, getPlatformCapabilities } from './native';
 import { debugLog, installCrashLogging } from './debug';
 import { AppTray } from './tray';
 import { HotkeyManager } from './hotkeys';
 import { OverlayWindowManager } from './overlay-window';
+import { installApplicationMenu } from './menu';
 import type { AppSettings, HotkeyRegistrationStatus } from '@shared/types';
 
 installCrashLogging();
@@ -20,6 +21,12 @@ debugLog(`main module loaded: argv=${JSON.stringify(process.argv)} packaged=${ap
 const startPage = process.env.DFH_START_PAGE ?? 'play';
 const screenshotPath = process.env.DFH_SCREENSHOT_PATH ?? '';
 const screenshotDelay = Number(process.env.DFH_SCREENSHOT_DELAY ?? 2600);
+// 截图/自动化验收可指定独立用户目录：不打断正在运行的主实例，也保证截图从干净设置开始
+const screenshotUserData = process.env.DFH_SCREENSHOT_USER_DATA ?? '';
+if (screenshotUserData) app.setPath('userData', screenshotUserData);
+// 截图/验收可指定窗口尺寸（默认为正式窗口尺寸）
+const windowWidth = Number(process.env.DFH_WINDOW_WIDTH ?? 0) || 1460;
+const windowHeight = Number(process.env.DFH_WINDOW_HEIGHT ?? 0) || 940;
 
 let mainWindow: BrowserWindow | null = null;
 let storage: AppStorage | null = null;
@@ -35,7 +42,7 @@ app.setName('三角洲口琴工坊');
 function resolveIconPath(): string | undefined {
   const candidates = app.isPackaged
     ? [join(process.resourcesPath, 'icon.png')]
-    : [join(app.getAppPath(), 'build', 'icon.png')];
+    : [join(app.getAppPath(), 'assets', 'icon.png')];
   return candidates.find((candidate) => existsSync(candidate));
 }
 
@@ -61,12 +68,12 @@ function loadRenderer(win: BrowserWindow, overlayMode: boolean): void {
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1460,
-    height: 940,
-    minWidth: 1120,
+    width: windowWidth,
+    height: windowHeight,
+    minWidth: 1024,
     minHeight: 720,
     show: false,
-    backgroundColor: '#080c13',
+    backgroundColor: '#07080b',
     title: '三角洲口琴工坊',
     autoHideMenuBar: true,
     ...(resolveIconPath() ? { icon: resolveIconPath() } : {}),
@@ -80,7 +87,7 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  Menu.setApplicationMenu(null);
+  installApplicationMenu();
   win.once('ready-to-show', () => {
     win.show();
     win.focus();
@@ -211,12 +218,36 @@ async function bootstrap(): Promise<void> {
   app.on('second-instance', () => showMainWindow());
 
   await app.whenReady();
-  debugLog('app ready');
+  const capabilities = getPlatformCapabilities();
+  debugLog(`app ready: platform=${capabilities.platform} arch=${process.arch} injection=${String(capabilities.gameInjection)}`);
+
+  // macOS 开发模式下 Dock 图标来自 Electron 默认图标，这里替换成产品图标；打包后由 icns 决定。
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const iconPath = resolveIconPath();
+    if (iconPath) app.dock?.setIcon(iconPath);
+  }
+  app.setAboutPanelOptions({
+    applicationName: '三角洲口琴工坊',
+    applicationVersion: app.getVersion(),
+    copyright: '非官方工具，仅供个人练习与娱乐使用',
+  });
 
   storage = new AppStorage(app.getPath('userData'));
   debugLog(`userData=${app.getPath('userData')}`);
   await storage.init();
   debugLog('storage initialized');
+
+  // macOS / Linux：没有 Win32 注入能力，首次启动直接把输入方式设为排练模式，
+  // 避免界面把「原生桥不可用」误报成故障，也避免用户点了开始却收到失败提示。
+  if (!capabilities.gameInjection) {
+    const input = storage.getSettings().input;
+    if (input.backend === 'software' || input.targetWindowHandle !== null) {
+      await storage.updateSettings({
+        input: { ...input, backend: 'dry-run', targetWindowHandle: null, targetWindowTitle: null },
+      });
+      debugLog('input backend switched to dry-run for unsupported platform');
+    }
+  }
 
   playback = new PlaybackController((status) => {
     debugLog(`playback status: ${JSON.stringify(status)}`);
@@ -319,6 +350,9 @@ void app.whenReady().then(bootstrap).catch((error) => {
 });
 
 app.on('window-all-closed', () => {
+  debugLog('window-all-closed');
+  // macOS 习惯：关闭窗口不退出应用，点击 Dock 图标（activate）时重新打开主窗口。
+  if (process.platform === 'darwin') return;
   debugLog('window-all-closed -> quit');
   app.quit();
 });
@@ -330,5 +364,5 @@ app.on('before-quit', () => {
   overlay?.destroy();
   tray?.destroy();
   void playback?.stop('程序退出');
-  getWin32Bridge().endPrecision();
+  getNativeBridge().endPrecision();
 });

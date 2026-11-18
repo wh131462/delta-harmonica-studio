@@ -22,7 +22,14 @@ export class AppTray {
     try {
       const image = nativeImage.createFromPath(this.iconPath);
       if (image.isEmpty()) return false;
-      const tray = new Tray(image.resize({ width: 18, height: 18 }));
+      // macOS 菜单栏需要 16–18px 单色图标；Windows / Linux 托盘用 18–22px。
+      const size = process.platform === 'darwin' ? 16 : process.platform === 'linux' ? 22 : 18;
+      const icon = image.resize({ width: size, height: size });
+      if (process.platform === 'darwin') {
+        // 使用透明通道作为剪影，跟随菜单栏亮/暗色自动反色
+        icon.setTemplateImage(true);
+      }
+      const tray = new Tray(icon);
       tray.setToolTip('三角洲口琴工坊');
       tray.on('click', () => this.handlers.showMain());
       this.tray = tray;

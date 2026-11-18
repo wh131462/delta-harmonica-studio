@@ -41,6 +41,9 @@ const api: RendererApi = {
     pick: (filters) => ipcRenderer.invoke('files:pick', filters),
     save: (request) => ipcRenderer.invoke('files:save', request),
   },
+  samples: {
+    read: (file) => ipcRenderer.invoke('samples:read', file),
+  },
   playback: {
     start: (request) => ipcRenderer.invoke('playback:start', request),
     stop: () => ipcRenderer.invoke('playback:stop'),

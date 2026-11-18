@@ -21,7 +21,7 @@ import type {
   PickedFile,
   SaveFileRequest,
 } from '@shared/types';
-import { getWin32Bridge } from './native/win32';
+import { getNativeBridge, getPlatformCapabilities } from './native';
 import { debugLog } from './debug';
 import type { OverlayWindowManager } from './overlay-window';
 import type { PlaybackController } from './playback-controller';
@@ -29,6 +29,14 @@ import type { AppStorage } from './storage';
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const MAX_PICKED_FILES = 10;
+const SAMPLE_FILE_PATTERN = /^(harmonica|piano)\/[A-Za-z0-9_#.-]+\.(wav|mp3)$/;
+
+/** 真实音源采样目录：开发时读仓库 resources/，打包后读 asar 外的 resources/audio-samples。 */
+function sampleRoot(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'audio-samples')
+    : path.join(app.getAppPath(), 'resources', 'audio-samples');
+}
 
 export interface IpcContext {
   storage: AppStorage;
@@ -69,7 +77,7 @@ async function readPickedFile(filePath: string): Promise<PickedFile> {
 
 function focusAppWindow(win: BrowserWindow | null): void {
   if (!win) return;
-  const bridge = getWin32Bridge();
+  const bridge = getNativeBridge();
   try {
     if (win.isMinimized()) win.restore();
     // FindWindowW 能拿到本窗口的原生句柄（自己的窗口不会出现在“目标游戏窗口”列表里）
@@ -84,7 +92,14 @@ function focusAppWindow(win: BrowserWindow | null): void {
 }
 
 async function relaunchElevated(): Promise<{ ok: boolean; message: string }> {
-  const bridge = getWin32Bridge();
+  const capabilities = getPlatformCapabilities();
+  if (!capabilities.gameInjection) {
+    return {
+      ok: false,
+      message: `${capabilities.label} 版不需要也无法提权：游戏注入仅在 Windows 可用，当前版本以排练模式运行。`,
+    };
+  }
+  const bridge = getNativeBridge();
   if (bridge.elevated) return { ok: true, message: '当前已经是管理员权限' };
   if (!app.isPackaged) {
     return { ok: false, message: '开发模式请以管理员身份重新启动终端后再运行；打包后的版本会通过 UAC 自动提权。' };
@@ -106,10 +121,33 @@ async function relaunchElevated(): Promise<{ ok: boolean; message: string }> {
 }
 
 function buildInputCheck(context: IpcContext): InputCheck {
-  const bridge = getWin32Bridge();
+  const capabilities = getPlatformCapabilities();
+  const bridge = getNativeBridge();
   const settings = context.storage.getSettings();
   const warnings: string[] = [];
   const notes: string[] = [];
+
+  // macOS / Linux：没有 Win32 注入链路，不把「桥不可用」当成故障上报。
+  if (!capabilities.gameInjection) {
+    notes.push(`当前平台：${capabilities.label}（${process.arch}）`);
+    notes.push('本版本保留编辑、导入、练习、试听与宏导出；游戏注入仅在 Windows 可用，演奏会按排练模式走时间轴。');
+    if (settings.input.backend === 'dry-run') {
+      notes.push('当前为「排练模式」：会走完整时间轴但不向游戏发送按键');
+    }
+    if (settings.input.backend === 'serial') {
+      warnings.push('串口 / Arduino 硬件输出尚未启用，且当前平台不支持游戏注入');
+    }
+    return {
+      elevated: false,
+      platform: process.platform,
+      gameInjection: false,
+      backend: settings.input.backend,
+      helperAvailable: false,
+      helperPath: null,
+      warnings,
+      notes,
+    };
+  }
 
   if (!bridge.available) warnings.push(`原生按键桥加载失败：${bridge.error ?? '未知错误'}`);
   if (!bridge.elevated) {
@@ -132,6 +170,8 @@ function buildInputCheck(context: IpcContext): InputCheck {
   notes.push(settings.input.focusGuard ? '焦点保护已开启：游戏窗口失去焦点时会自动停手' : '焦点保护已关闭：请自行确保游戏窗口在前台');
   return {
     elevated: bridge.elevated,
+    platform: process.platform,
+    gameInjection: true,
     backend: settings.input.backend,
     helperAvailable: bridge.available,
     helperPath: null,
@@ -149,7 +189,9 @@ export function registerIpcHandlers(context: IpcContext): void {
     chromeVersion: process.versions.chrome ?? '',
     nodeVersion: process.versions.node ?? '',
     platform: process.platform,
-    elevated: getWin32Bridge().elevated,
+    arch: process.arch,
+    capabilities: getPlatformCapabilities(),
+    elevated: getNativeBridge().elevated,
     userDataPath: context.userDataDir,
     isPackaged: app.isPackaged,
     startPage: context.startPage,
@@ -232,6 +274,20 @@ export function registerIpcHandlers(context: IpcContext): void {
     return result.filePath;
   });
 
+  ipcMain.handle('samples:read', async (_event, file: unknown): Promise<Uint8Array> => {
+    if (typeof file !== 'string' || !SAMPLE_FILE_PATTERN.test(file)) {
+      throw new Error('无效的音源文件');
+    }
+    const root = sampleRoot();
+    const target = path.resolve(root, file);
+    if (!target.startsWith(`${root}${path.sep}`)) throw new Error('无效的音源路径');
+    try {
+      return new Uint8Array(await fs.readFile(target));
+    } catch {
+      throw new Error(`音源文件缺失：${file}`);
+    }
+  });
+
   ipcMain.handle('library:export', async (_event, score: Score, format: ExportFormat): Promise<string | null> => {
     const baseName = safeFileName(score?.meta?.title ?? '未命名');
     const buildMacro = (macroFormat: MacroFormat) => {
@@ -247,6 +303,13 @@ export function registerIpcHandlers(context: IpcContext): void {
     switch (format) {
       case 'macro-ahk': {
         const macro = buildMacro('ahk');
+        content = macro.text;
+        extension = macro.extension;
+        filterName = macro.filterName;
+        break;
+      }
+      case 'macro-ahk2': {
+        const macro = buildMacro('ahk2');
         content = macro.text;
         extension = macro.extension;
         filterName = macro.filterName;
@@ -320,10 +383,17 @@ export function registerIpcHandlers(context: IpcContext): void {
     await playback.panicRelease();
   });
   ipcMain.handle('playback:selfTest', async () => {
+    const capabilities = getPlatformCapabilities();
+    if (!capabilities.gameInjection) {
+      return {
+        ok: false,
+        message: `${capabilities.label} 版不向系统注入按键，无法进行输入通道自检；编辑、练习与试听不受影响。`,
+      };
+    }
     const win = context.getMainWindow();
     focusAppWindow(win);
     await new Promise((resolve) => setTimeout(resolve, 250));
-    const bridge = getWin32Bridge();
+    const bridge = getNativeBridge();
     const handle = win ? bridge.findWindowByTitle(win.getTitle()) : null;
     const foreground = bridge.foregroundWindow();
     const focused = win?.isFocused() ?? false;
@@ -350,8 +420,8 @@ export function registerIpcHandlers(context: IpcContext): void {
     }
   });
 
-  ipcMain.handle('windows:list', () => getWin32Bridge().listWindows());
-  ipcMain.handle('windows:focus', (_event, handle: number) => getWin32Bridge().focusWindow(handle));
+  ipcMain.handle('windows:list', () => getNativeBridge().listWindows());
+  ipcMain.handle('windows:focus', (_event, handle: number) => getNativeBridge().focusWindow(handle));
   ipcMain.handle('input:check', () => buildInputCheck(context));
 
   ipcMain.handle('hotkeys:status', (): HotkeyRegistrationStatus[] => context.getHotkeyStatuses());

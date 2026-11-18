@@ -9,11 +9,27 @@
  *   （函数返回成功但系统无事件，这是实测踩过的坑）。
  * - 把目标窗口切前台需要 AttachThreadInput + SetForegroundWindow + SetFocus 组合。
  */
-import koffi from 'koffi';
+import type koffiType from 'koffi';
 import path from 'node:path';
 import type { InputEvent } from '@core/instrument/plan';
 import type { MouseButton } from '@core/model/instrument';
 import type { WindowInfo } from '@shared/types';
+
+type KoffiModule = typeof koffiType;
+
+let koffiModule: KoffiModule | null = null;
+
+/**
+ * koffi 是平台相关的原生模块（FFI）。只在 Windows 上真正加载：
+ * macOS / Linux 版没有 Win32 注入能力，也不应该因为原生模块缺失而启动失败。
+ */
+function loadKoffi(): KoffiModule {
+  if (!koffiModule) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    koffiModule = require('koffi') as KoffiModule;
+  }
+  return koffiModule;
+}
 
 const INPUT_MOUSE = 0;
 const INPUT_KEYBOARD = 1;
@@ -108,7 +124,13 @@ class Win32Bridge {
   }
 
   private init(): void {
+    if (process.platform !== 'win32') {
+      this.available = false;
+      this.error = '当前平台不是 Windows：Win32 键鼠注入不可用（macOS / Linux 版以排练模式运行）';
+      return;
+    }
     try {
+      const koffi = loadKoffi();
       const user32 = koffi.load('user32.dll');
       const winmm = koffi.load('winmm.dll');
       const kernel32 = koffi.load('kernel32.dll');
@@ -383,6 +405,7 @@ class Win32Bridge {
   /** 枚举当前可见、带标题的顶层窗口 */
   listWindows(): WindowInfo[] {
     if (!this.api || !this.callbackType) return [];
+    const koffi = loadKoffi();
     const api = this.api;
     const results: WindowInfo[] = [];
     const foreground = this.foregroundWindow();

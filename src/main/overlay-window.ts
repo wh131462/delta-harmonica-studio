@@ -18,10 +18,20 @@ export interface OverlayWindowDeps {
 
 const WIDTH = 392;
 const HEIGHT = 176;
+const IS_MAC = process.platform === 'darwin';
 
 function clampOpacity(value: number): number {
   if (!Number.isFinite(value)) return 0.96;
   return Math.min(1, Math.max(0.3, value));
+}
+
+/**
+ * 置顶层级：macOS 用 panel + screen-saver 层级才能盖在全屏游戏之上；
+ * Windows / Linux 沿用原有 screen-saver 层级。
+ */
+function applyAlwaysOnTop(win: BrowserWindow, alwaysOnTop: boolean): void {
+  if (IS_MAC) win.setAlwaysOnTop(alwaysOnTop, 'screen-saver', 1);
+  else win.setAlwaysOnTop(alwaysOnTop, 'screen-saver');
 }
 
 export class OverlayWindowManager {
@@ -72,6 +82,7 @@ export class OverlayWindowManager {
       hasShadow: false,
       show: false,
       title: '口琴工坊·悬浮控制',
+      ...(IS_MAC ? { type: 'panel' as const, acceptFirstMouse: true } : {}),
       ...(this.deps.iconPath ? { icon: this.deps.iconPath } : {}),
       webPreferences: {
         preload: this.deps.preloadPath,
@@ -83,9 +94,11 @@ export class OverlayWindowManager {
       },
     });
 
-    win.setAlwaysOnTop(settings.alwaysOnTop, 'screen-saver');
+    applyAlwaysOnTop(win, settings.alwaysOnTop);
     win.setOpacity(clampOpacity(settings.opacity));
     win.setSkipTaskbar(true);
+    // macOS：悬浮窗跟随所有桌面空间，并在全屏游戏之上可见
+    if (IS_MAC) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     this.deps.load(win);
     win.webContents.on('did-finish-load', () => {
@@ -121,7 +134,7 @@ export class OverlayWindowManager {
   setVisible(visible: boolean, settings: OverlaySettings): boolean {
     const win = this.ensureWindow(settings);
     if (visible) {
-      win.setAlwaysOnTop(settings.alwaysOnTop, 'screen-saver');
+      applyAlwaysOnTop(win, settings.alwaysOnTop);
       win.setOpacity(clampOpacity(settings.opacity));
       win.showInactive();
       debugLog(
@@ -139,11 +152,16 @@ export class OverlayWindowManager {
   applySettings(settings: OverlaySettings): void {
     const win = this.getWindow();
     if (!win) return;
-    win.setAlwaysOnTop(settings.alwaysOnTop, 'screen-saver');
+    applyAlwaysOnTop(win, settings.alwaysOnTop);
     win.setOpacity(clampOpacity(settings.opacity));
     if (!settings.position) {
       const workArea = screen.getPrimaryDisplay().workArea;
-      win.setPosition(workArea.x + workArea.width - WIDTH - 26, workArea.y + workArea.height - HEIGHT - 26);
+      try {
+        win.setPosition(workArea.x + workArea.width - WIDTH - 26, workArea.y + workArea.height - HEIGHT - 26);
+      } catch (error) {
+        // Wayland 等环境不允许程序定位窗口：保留当前位置，仅记录日志
+        debugLog(`overlay reposition failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     if (!settings.visible && win.isVisible()) {
       win.hide();

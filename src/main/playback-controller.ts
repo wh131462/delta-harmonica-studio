@@ -5,7 +5,7 @@
  * - 焦点看门狗：目标窗口一旦不在前台立即停手并释放所有按键（避免误输入到聊天框）
  * - 全量松键：任何停止/异常路径都会释放已按下的键与鼠标键（安全第一）
  */
-import { getWin32Bridge, isTargetForeground } from './native/win32';
+import { getNativeBridge, getPlatformCapabilities, isTargetForeground } from './native';
 import type { InputEvent } from '@core/instrument/plan';
 import type { InputBackend, PlaybackRequest, PlaybackStatus, StartPlaybackResult } from '@shared/types';
 
@@ -40,7 +40,7 @@ export class PlaybackController {
   }
 
   private getBridge() {
-    return getWin32Bridge();
+    return getNativeBridge();
   }
 
   /** 开始演奏（含倒计时、焦点检查） */
@@ -51,9 +51,16 @@ export class PlaybackController {
     const events = Array.isArray(request.events) ? request.events : [];
     if (events.length === 0) return { ok: false, message: '演奏计划为空' };
 
+    const capabilities = getPlatformCapabilities();
     const bridge = this.getBridge();
     if (request.backend === 'serial') {
       return { ok: false, message: '串口/Arduino 硬件输出尚未启用（预留接口），请使用“模拟按键”或“仅试听”模式' };
+    }
+    if (request.backend === 'software' && !capabilities.gameInjection) {
+      return {
+        ok: false,
+        message: `${capabilities.label} 版不向其他窗口注入按键：请在设置里使用「排练模式」，或改用 Windows 版演奏。`,
+      };
     }
     if (request.backend === 'software' && !bridge.available) {
       return { ok: false, message: `原生按键桥不可用：${bridge.error ?? '未知错误'}` };
