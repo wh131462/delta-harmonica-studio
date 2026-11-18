@@ -1,0 +1,302 @@
+/* 实时录入 · 悬浮录制条
+   固定右下、无遮罩、不参与页面流：打开/关闭录制不会改变编辑器布局或滚动位置。 */
+
+/* 只挡住鼠标操作，不改变任何视觉 */
+.record-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: transparent;
+}
+
+.record-hud {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: calc(var(--dock-h) + var(--sp-4));
+  z-index: calc(var(--z-toast) + 1);
+  width: min(720px, calc(100vw - var(--sp-8)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-3);
+  outline: none;
+  user-select: none;
+}
+
+/* ---------- 头部：标题 / 状态 / 量化 / 操作 ---------- */
+
+.record-hud__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.record-hud__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.record-hud__title svg {
+  color: var(--accent);
+}
+
+.record-hud__status {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.record-hud__head .record-grid {
+  margin-left: auto;
+}
+
+.record-hud__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* ---------- 键位行 ---------- */
+
+.record-hud__keys {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.record-hud .record-keys {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.record-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  padding: 3px var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-inset);
+  transition:
+    background var(--dur-1) var(--ease-in-out),
+    border-color var(--dur-1) var(--ease-in-out);
+}
+
+.record-key.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.record-key__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-subtitle);
+  font-weight: 650;
+  line-height: 1.15;
+  color: var(--text-1);
+}
+
+.record-key.is-active .record-key__label {
+  color: var(--accent);
+}
+
+.record-key__degree {
+  font-size: var(--fs-micro);
+  line-height: 1.15;
+  color: var(--text-3);
+}
+
+.record-key.is-active .record-key__degree {
+  color: var(--accent);
+}
+
+.record-hud .record-mods {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+}
+
+.record-mod {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  color: var(--text-3);
+  white-space: nowrap;
+  transition:
+    background var(--dur-1) var(--ease-in-out),
+    border-color var(--dur-1) var(--ease-in-out);
+}
+
+.record-mod.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.record-mod__label {
+  opacity: 0.8;
+}
+
+.record-mod__action {
+  font-weight: 600;
+  color: inherit;
+}
+
+/* ---------- 实时谱面（紧凑单行） ---------- */
+
+.record-hud__paper {
+  height: 58px;
+  overflow-y: auto;
+  padding: var(--sp-1) var(--sp-2);
+  scrollbar-gutter: stable;
+}
+
+.record-hud__paper .score-line {
+  gap: 0;
+  padding: 0;
+}
+
+.record-hud__paper .score-line__row {
+  min-height: 0;
+  row-gap: 1px;
+  column-gap: 1px;
+}
+
+.record-hud__paper .score-note {
+  min-width: 24px;
+  padding: 0 2px;
+  gap: 0;
+}
+
+.record-hud__paper .score-note__glyph {
+  grid-template-rows: 6px 20px 4px 6px;
+  min-width: 16px;
+}
+
+.record-hud__paper .score-note__digit {
+  font-size: var(--fs-title);
+}
+
+.record-hud__paper .score-note__beats,
+.record-hud__paper .score-note__tie {
+  display: none;
+}
+
+.record-hud__paper .score-note__underlines {
+  width: 12px;
+}
+
+.record-hud__paper .score-note__dots i,
+.record-hud__paper .score-note__dot {
+  width: 2px;
+  height: 2px;
+}
+
+.record-hud__paper .score-line__bar {
+  margin: 2px var(--sp-1);
+}
+
+.record-hud__paper .record-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 100%;
+  min-height: 0;
+  text-align: left;
+  color: var(--text-3);
+}
+
+.record-hud__paper .record-empty svg {
+  color: var(--text-4);
+}
+
+.record-hud__paper .record-empty p {
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
+/* ---------- 底部：速度 / 插入位置 / 提示 ---------- */
+
+.record-hud__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+.record-hud__meta {
+  color: var(--text-3);
+}
+
+.record-hud__live {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-hud__hint {
+  margin-left: auto;
+  color: var(--text-4);
+}
+
+.record-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+.record-warning svg {
+  flex: 0 0 auto;
+}
+
+/* ---------- 窄窗口兜底 ---------- */
+
+@media (max-width: 860px) {
+  .record-hud {
+    right: var(--sp-3);
+    left: var(--sp-3);
+    width: auto;
+  }
+
+  .record-hud__keys {
+    flex-wrap: wrap;
+  }
+
+  .record-hud .record-mods {
+    flex-wrap: wrap;
+  }
+
+  .record-hud__hint {
+    margin-left: 0;
+  }
+}

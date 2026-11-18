@@ -1,0 +1,275 @@
+/**
+ * 可视化简谱行（ScoreLineEditor）样式。
+ *
+ * 纸面颜色来自 --paper-* 令牌；选中 / 播放高亮使用琥珀强调色。
+ * 音符块用固定网格行（高八度点 / 数字 / 减时线 / 低八度点）保证所有数字
+ * 在同一水平线上，不会因为八度点多少而上下跳动。
+ */
+
+.score-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+}
+
+.score-line__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  column-gap: var(--sp-1);
+  row-gap: var(--sp-2);
+  min-height: 64px;
+}
+
+/* ---------- 小节线 ---------- */
+
+.score-line__bar {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 1px;
+  margin: var(--sp-2) var(--sp-2);
+  background: var(--paper-barline-strong);
+  opacity: 0.42;
+}
+
+.score-line__bar.is-strong {
+  width: 2px;
+  background: var(--paper-barline-strong);
+  opacity: 0.9;
+}
+
+.score-line__bar.is-final {
+  width: 5px;
+  background: linear-gradient(
+    90deg,
+    var(--paper-barline-strong) 0 1px,
+    transparent 1px 3px,
+    var(--paper-barline-strong) 3px 5px
+  );
+  opacity: 0.9;
+}
+
+/* ---------- 音符块 ---------- */
+
+.score-note {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 38px;
+  padding: var(--sp-1);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--paper-ink);
+  font-family: var(--font-sans);
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background var(--dur-1) var(--ease-in-out),
+    border-color var(--dur-1) var(--ease-in-out),
+    color var(--dur-1) var(--ease-in-out);
+}
+
+.score-note:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.score-note:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.score-note.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.score-note.is-active .score-note__digit {
+  color: var(--accent);
+}
+
+.score-note.is-active::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.score-note.is-flash {
+  animation: score-note-flash 620ms var(--ease-out);
+}
+
+/* 只读预览（实时录入）：保留谱面外观，但不响应鼠标 */
+.score-line--readonly .score-note {
+  cursor: default;
+}
+
+.score-line--readonly .score-note:hover,
+.score-line--readonly .score-note:active {
+  background: transparent;
+  border-color: transparent;
+}
+
+@keyframes score-note-flash {
+  0% {
+    background: var(--accent-soft);
+    border-color: var(--accent-line);
+  }
+  100% {
+    background: transparent;
+    border-color: transparent;
+  }
+}
+
+/* ---------- 简谱字形 ---------- */
+
+.score-note__glyph {
+  display: grid;
+  grid-template-rows: 10px 28px 8px 10px;
+  justify-items: center;
+  align-items: center;
+  min-width: 24px;
+}
+
+.score-note__body {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  grid-row: 2;
+}
+
+.score-note__digit {
+  font-size: var(--fs-display);
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-ink);
+  transition: color var(--dur-1) var(--ease-in-out);
+}
+
+.score-note--rest .score-note__digit {
+  color: var(--paper-rest-ink);
+}
+
+.score-note__accidental {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--paper-ink);
+  transform: translateY(-4px);
+}
+
+.score-note__dot {
+  width: 3px;
+  height: 3px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.score-note__dash {
+  margin-left: 3px;
+  font-size: var(--fs-body);
+  line-height: 1;
+  letter-spacing: -1px;
+  color: currentColor;
+}
+
+/* 八度点：上下各占固定一行，点竖向堆叠 */
+.score-note__dots {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  justify-content: flex-end;
+  grid-row: 1;
+  width: 100%;
+}
+
+.score-note__dots--down {
+  grid-row: 4;
+  justify-content: flex-start;
+}
+
+.score-note__dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 减时线 */
+.score-note__underlines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  grid-row: 3;
+}
+
+.score-note__underlines i {
+  width: 100%;
+  height: 1.5px;
+  border-radius: var(--r-full);
+  background: currentColor;
+}
+
+/* 拍数标签：让“1 拍 / ½ 拍”一眼可见；密集谱只保留 hover / 选中时显示 */
+.score-note__beats {
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--paper-ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity var(--dur-1) var(--ease-in-out);
+}
+
+.score-line--dense .score-note__beats {
+  opacity: 0;
+}
+
+.score-line--dense .score-note:hover .score-note__beats,
+.score-line--dense .score-note.is-selected .score-note__beats,
+.score-line--dense .score-note:focus-visible .score-note__beats {
+  opacity: 1;
+}
+
+.score-note.is-selected .score-note__beats {
+  color: var(--accent);
+}
+
+/* 连音标记 */
+.score-note__tie {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--paper-ink-dim);
+}
+
+.score-note.is-selected .score-note__tie {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-note {
+    transition: none;
+  }
+  .score-note.is-flash {
+    animation: none;
+  }
+}

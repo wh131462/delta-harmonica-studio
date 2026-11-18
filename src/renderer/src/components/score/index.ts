@@ -11,6 +11,11 @@ export {
 } from './ScoreView';
 
 export {
+  ScoreLineEditor,
+  type ScoreLineEditorProps,
+} from './ScoreLineEditor';
+
+export {
   beatToPoint,
   describeDuration,
   formatBeatCount,
