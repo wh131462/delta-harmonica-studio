@@ -6,6 +6,9 @@ out/
 release/
 dist/
 
+# 静态官网构建产物：npm run site:build 生成，GitHub Pages 工作流会重新生成
+dist-site/
+
 # 旧版 electron-builder buildResources 目录（图标已迁移到 assets/）
 # 忽略它，避免打包工具留下的 .icon-ico / 缓存再次被误提交
 build/
