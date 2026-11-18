@@ -1,28 +1,29 @@
 /**
  * 音乐方案库页面
  * ------------------------------------------------------------------
+ * 结构：PageHeader → 未保存提示（条件出现）→ 紧凑统计行 →
+ *       工具栏（搜索/视图、筛选/排序/刷新）→ 结果（网格卡片 / 紧凑列表）→ 批量操作条。
  * 功能：搜索（标题/艺术家）、筛选（全部/收藏/游戏任务曲/导入曲谱/手动录入）、
- *       排序（最近更新/标题/时长/音符数）、网格与列表视图切换（本地持久化）、
- *       卡片 hover 快速「演奏/编辑」、更多菜单（导出键位谱/简谱/方案 JSON、删除）、
- *       最近更新置顶区、统计信息、批量管理（多选收藏/删除）、导入/新建/空态引导。
- *
- * 说明：所有数据与操作都复用 app-store 与 window.api.library；
- *       页面级样式见 ../styles/library.css（类名统一 lb- 前缀）。
+ *       排序（最近更新/标题/时长/音符数）、网格与列表视图（本地持久化）、
+ *       打开演奏台/编辑器、收藏、删除、导出（键位谱/简谱/JSON/鼠标宏/键位表）、
+ *       批量管理、当前曲谱标记；未保存修改提示（条件出现，提供继续编辑/保存）。
+ * 说明：数据与操作复用 app-store 与 window.api.library；本页只负责呈现与交互编排。
+ *       页面样式见 ../styles/library.css（类名统一 library- 前缀）。
  */
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type SyntheticEvent,
 } from 'react';
 import { importMidiFile } from '@core/import/midi';
 import type { Score } from '@core/model/score';
 import { buildScoreFromText } from '@core/score/dsl';
 import { Icon } from '@renderer/components/Icon';
-import { EmptyState, PageHeader } from '@renderer/components/PageHeader';
+import { Chip, EmptyState, Notice, PageHeader } from '@renderer/components/PageHeader';
 import { useAppStore } from '@renderer/state/app-store';
 import { beatsToMs, formatDateTime, formatDurationMs, keyLabel, sourceKindLabel } from '@renderer/utils/format';
 import type { ExportFormat, LibraryEntry } from '@shared/types';
@@ -31,7 +32,6 @@ import '../styles/library.css';
 type FilterKind = 'all' | 'favorite' | 'game' | 'imported' | 'manual';
 type SortKind = 'updated' | 'title' | 'duration' | 'notes';
 type ViewMode = 'grid' | 'list';
-type SourceTone = 'builtin' | 'midi' | 'audio' | 'text' | 'manual';
 
 /** 网格/列表视图的本地记忆键（localStorage） */
 const VIEW_MODE_KEY = 'dfh.library.viewMode';
@@ -51,18 +51,18 @@ const SORT_OPTIONS: Array<{ id: SortKind; label: string }> = [
   { id: 'notes', label: '按音符数' },
 ];
 
-/** 来源徽标：内置 / MIDI / 音频 / 文本 / 手动 / 键位谱 */
-const SOURCE_BADGES: Record<string, { label: string; tone: SourceTone }> = {
-  builtin: { label: '内置', tone: 'builtin' },
-  midi: { label: 'MIDI', tone: 'midi' },
-  audio: { label: '音频', tone: 'audio' },
-  text: { label: '文本', tone: 'text' },
-  manual: { label: '手动', tone: 'manual' },
-  keyscore: { label: '键位谱', tone: 'text' },
+/** 来源徽标：内置 / MIDI / 音频 / 文本 / 手动 / 键位谱（统一中性色，不抢状态语义） */
+const SOURCE_LABELS: Record<string, string> = {
+  builtin: '内置',
+  midi: 'MIDI',
+  audio: '音频',
+  text: '文本',
+  manual: '手动',
+  keyscore: '键位谱',
 };
 
-function getSourceBadge(kind: string): { label: string; tone: SourceTone } {
-  return SOURCE_BADGES[kind] ?? { label: sourceKindLabel(kind), tone: 'manual' };
+function getSourceLabel(kind: string): string {
+  return SOURCE_LABELS[kind] ?? sourceKindLabel(kind);
 }
 
 /** 由「拍数 + 速度」换算出毫秒，用于时长展示 */
@@ -101,27 +101,6 @@ function readViewMode(): ViewMode {
   }
 }
 
-/** 网格视图图标（Icon 组件没有现成图标，这里内联一个轻量 SVG） */
-function GridViewIcon(): JSX.Element {
-  return (
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="4" y="4" width="7" height="7" rx="1.6" />
-      <rect x="13" y="4" width="7" height="7" rx="1.6" />
-      <rect x="4" y="13" width="7" height="7" rx="1.6" />
-      <rect x="13" y="13" width="7" height="7" rx="1.6" />
-    </svg>
-  );
-}
-
-/** 列表视图图标 */
-function ListViewIcon(): JSX.Element {
-  return (
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 7h14M5 12h14M5 17h14" />
-    </svg>
-  );
-}
-
 export function LibraryPage(): JSX.Element {
   const app = useAppStore();
 
@@ -133,9 +112,12 @@ export function LibraryPage(): JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set<string>());
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const searchRef = useRef<HTMLInputElement>(null);
-  const menuRootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const menuWrapRef = useRef<HTMLDivElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   // 记住网格/列表视图选择
   useEffect(() => {
@@ -176,6 +158,23 @@ export function LibraryPage(): JSX.Element {
     if (selectionMode) setSelectedIds(new Set<string>());
   }, [filter, search, selectionMode]);
 
+  // 搜索、筛选、排序、视图或模式变化时收起更多菜单
+  useEffect(() => {
+    setOpenMenuId(null);
+  }, [filter, search, sort, view, selectionMode]);
+
+  // 更多菜单：打开后聚焦第一个菜单项；点击菜单外部或按 Esc 关闭
+  useEffect(() => {
+    if (!openMenuId) return undefined;
+    menuPanelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && menuWrapRef.current?.contains(event.target)) return;
+      setOpenMenuId(null);
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [openMenuId]);
+
   /** 过滤 + 排序后的可见方案 */
   const visibleEntries = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -187,18 +186,7 @@ export function LibraryPage(): JSX.Element {
     return sortEntries(list, sort);
   }, [app.entries, filter, search, sort]);
 
-  /** 顶部统计 */
-  const stats = useMemo(
-    () => ({
-      total: app.entries.length,
-      favorites: app.entries.filter((entry) => entry.favorite).length,
-      imported: app.entries.filter((entry) => entry.sourceKind === 'midi' || entry.sourceKind === 'audio').length,
-      notes: app.entries.reduce((sum, entry) => sum + entry.noteCount, 0),
-    }),
-    [app.entries],
-  );
-
-  /** 各筛选项数量（用于工具栏角标） */
+  /** 各筛选项数量（用于按钮的 title / aria-label，不在视觉上堆数字） */
   const filterCounts = useMemo(() => {
     const counts: Record<FilterKind, number> = {
       all: app.entries.length,
@@ -216,12 +204,6 @@ export function LibraryPage(): JSX.Element {
     return counts;
   }, [app.entries]);
 
-  /** 最近更新的前 3 个方案（仅在未搜索/未筛选且方案充足时展示，避免与列表重复过多） */
-  const recentEntries = useMemo(() => {
-    if (search.trim() || filter !== 'all' || app.entries.length <= 3) return [];
-    return [...app.entries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
-  }, [app.entries, filter, search]);
-
   const isFiltering = search.trim().length > 0 || filter !== 'all';
   const selectedCount = selectedIds.size;
 
@@ -231,7 +213,16 @@ export function LibraryPage(): JSX.Element {
     void app.openScore(entry.id, page);
   };
 
-  /** 点击卡片/行：批量模式下切换选中，否则打开演奏台 */
+  const toggleSelected = (id: string) => {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /** 卡片/行的主操作：批量模式下切换选中，否则打开演奏台 */
   const activateEntry = (entry: LibraryEntry) => {
     if (selectionMode) {
       toggleSelected(entry.id);
@@ -240,13 +231,11 @@ export function LibraryPage(): JSX.Element {
     openEntry(entry, 'play');
   };
 
-  const handleEntryKeyDown = (event: ReactKeyboardEvent<HTMLElement>, entry: LibraryEntry) => {
-    // 只响应卡片本身获得焦点时的键盘事件，避免干扰内部按钮
-    if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      activateEntry(entry);
-    }
+  /** 点击卡片空白处（忽略内部按钮与菜单）执行主操作 */
+  const handleSurfaceClick = (event: ReactMouseEvent<HTMLElement>, entry: LibraryEntry) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('button, a, input, select, textarea, [role="menu"]')) return;
+    activateEntry(entry);
   };
 
   /** 导出：键位谱 / 简谱文本 / 方案 JSON / 鼠标宏 / 触发键位表 */
@@ -321,16 +310,60 @@ export function LibraryPage(): JSX.Element {
     }
   };
 
-  // ---------------- 批量管理 ----------------
+  // ---------------- 更多菜单 ----------------
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setOpenMenuId(null);
+    if (restoreFocus) menuTriggerRef.current?.focus();
+  }, []);
+
+  const toggleMenu = (entry: LibraryEntry, trigger: HTMLButtonElement) => {
+    if (openMenuId === entry.id) {
+      setOpenMenuId(null);
+      return;
+    }
+    menuTriggerRef.current = trigger;
+    setOpenMenuId(entry.id);
   };
+
+  /** 执行菜单项：先收起菜单并把焦点还给触发按钮，再执行动作 */
+  const runMenuAction = (action: () => void) => {
+    setOpenMenuId(null);
+    menuTriggerRef.current?.focus();
+    action();
+  };
+
+  /** 菜单键盘操作：Esc 关闭并回到触发按钮，方向键在菜单项间移动，Tab 收起菜单 */
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu(true);
+      return;
+    }
+    if (event.key === 'Tab') {
+      closeMenu(true);
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const items = Array.from(menuPanelRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === 'Home') {
+      items[0]?.focus();
+      return;
+    }
+    if (event.key === 'End') {
+      items[items.length - 1]?.focus();
+      return;
+    }
+    const offset = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + offset + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
+
+  // ---------------- 批量管理 ----------------
 
   const toggleSelectionMode = () => {
     setSelectionMode((previous) => !previous);
@@ -373,168 +406,226 @@ export function LibraryPage(): JSX.Element {
     setFilter('all');
   };
 
-  // ---------------- 更多菜单 ----------------
+  // ---------------- 收藏 / 选择 / 更多菜单 ----------------
 
-  const closeAllMenus = () => {
-    menuRootRef.current?.querySelectorAll<HTMLDetailsElement>('details.lb-menu[open]').forEach((node) => {
-      node.open = false;
-    });
-  };
-
-  /** 同时只允许展开一个更多菜单 */
-  const handleMenuToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
-    if (!event.currentTarget.open) return;
-    menuRootRef.current?.querySelectorAll<HTMLDetailsElement>('details.lb-menu[open]').forEach((node) => {
-      if (node !== event.currentTarget) node.open = false;
-    });
-  };
-
-  /** 菜单内按钮点击后关闭菜单，并阻止事件冒泡到卡片 */
-  const handleMenuAction = (event: ReactMouseEvent<HTMLButtonElement>, action: () => void) => {
-    event.stopPropagation();
-    event.currentTarget.closest('details')?.removeAttribute('open');
-    action();
-  };
-
-  /** 页面空白处点击时收起所有更多菜单 */
-  const handlePageClick = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('.lb-menu')) return;
-    closeAllMenus();
-  };
-
-  /** 卡片星标 */
-  const renderStar = (entry: LibraryEntry, size: number): JSX.Element => (
+  /** 收藏星标（aria-pressed 表达状态，与「当前」徽标语义区分） */
+  const renderFavorite = (entry: LibraryEntry): JSX.Element => (
     <button
       type="button"
-      className={`lb-star ${entry.favorite ? 'active' : ''}`}
-      title={entry.favorite ? '取消收藏' : '收藏'}
+      className="btn btn--icon btn--sm btn--quiet library-fav"
+      aria-pressed={entry.favorite}
       aria-label={entry.favorite ? `取消收藏《${entry.title}》` : `收藏《${entry.title}》`}
-      onClick={(event) => {
-        event.stopPropagation();
-        void app.toggleFavorite(entry.id);
-      }}
+      title={entry.favorite ? '取消收藏' : '收藏'}
+      onClick={() => void app.toggleFavorite(entry.id)}
     >
-      <Icon name="star" size={size} />
+      <Icon name="star" size={15} />
     </button>
   );
 
-  /** 更多操作菜单（导出三种格式 + 删除），网格与列表共用 */
-  const renderMenu = (entry: LibraryEntry): JSX.Element => (
-    <details className="lb-menu" onClick={(event) => event.stopPropagation()} onToggle={handleMenuToggle}>
-      <summary className="lb-icon-btn" title="更多操作" aria-label={`《${entry.title}》更多操作`}>
-        <Icon name="chevron" size={14} />
-      </summary>
-      <div className="lb-menu-list" role="menu">
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'keys'))}>
-          <Icon name="download" size={13} /> 导出键位谱
-        </button>
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'dsl'))}>
-          <Icon name="edit" size={13} /> 导出简谱文本
-        </button>
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'json'))}>
-          <Icon name="download" size={13} /> 导出方案 JSON
-        </button>
-        <span className="lb-menu-sep" role="separator" />
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-ahk'))}>
-          <Icon name="download" size={13} /> 导出 AutoHotkey 宏
-        </button>
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-lua'))}>
-          <Icon name="download" size={13} /> 导出罗技 G HUB Lua 宏
-        </button>
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'macro-csv'))}>
-          <Icon name="download" size={13} /> 导出宏时序表 CSV
-        </button>
-        <button type="button" role="menuitem" onClick={(event) => handleMenuAction(event, () => void exportScore(entry.id, 'trigger-table'))}>
-          <Icon name="download" size={13} /> 导出触发键位表
-        </button>
-        <span className="lb-menu-sep" role="separator" />
-        <button type="button" role="menuitem" className="danger" onClick={(event) => handleMenuAction(event, () => void remove(entry))}>
-          <Icon name="trash" size={13} /> 删除方案
-        </button>
-      </div>
-    </details>
+  /** 批量模式下的选择开关 */
+  const renderSelectToggle = (entry: LibraryEntry, checked: boolean): JSX.Element => (
+    <button
+      type="button"
+      className={`btn btn--icon btn--sm ${checked ? 'is-active' : ''}`}
+      aria-pressed={checked}
+      aria-label={checked ? `取消选择《${entry.title}》` : `选择《${entry.title}》`}
+      title={checked ? '取消选择' : '选择'}
+      onClick={() => toggleSelected(entry.id)}
+    >
+      <Icon name={checked ? 'checkbox' : 'checkbox-blank'} size={15} />
+    </button>
   );
+
+  /** 更多操作菜单（打开编辑器 / 导出 / 删除），网格与列表共用 */
+  const renderMenu = (entry: LibraryEntry): JSX.Element => {
+    const menuId = `library-menu-${entry.id}`;
+    const open = openMenuId === entry.id;
+    return (
+      <div className="library-menu-anchor" ref={open ? menuWrapRef : undefined}>
+        <button
+          type="button"
+          className="btn btn--icon btn--sm btn--quiet library-menu-trigger"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          aria-label={`《${entry.title}》更多操作`}
+          title="更多操作"
+          onClick={(event) => toggleMenu(entry, event.currentTarget)}
+        >
+          <Icon name="more" size={16} />
+        </button>
+        {open ? (
+          <div
+            id={menuId}
+            className="library-menu"
+            role="menu"
+            aria-label={`《${entry.title}》操作`}
+            ref={menuPanelRef}
+            onKeyDown={handleMenuKeyDown}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => openEntry(entry, 'editor'))}
+            >
+              <Icon name="edit" size={14} /> 在编辑器中打开
+            </button>
+            <span className="library-menu__sep" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'keys'))}
+            >
+              <Icon name="download" size={14} /> 导出键位谱
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'dsl'))}
+            >
+              <Icon name="download" size={14} /> 导出简谱文本
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'json'))}
+            >
+              <Icon name="download" size={14} /> 导出方案 JSON
+            </button>
+            <span className="library-menu__sep" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'macro-ahk'))}
+            >
+              <Icon name="download" size={14} /> 导出 AutoHotkey v1 宏
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'macro-ahk2'))}
+            >
+              <Icon name="download" size={14} /> 导出 AutoHotkey v2 宏
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'macro-lua'))}
+            >
+              <Icon name="download" size={14} /> 导出罗技 G HUB Lua 宏
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'macro-csv'))}
+            >
+              <Icon name="download" size={14} /> 导出宏时序表 CSV
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item"
+              onClick={() => runMenuAction(() => void exportScore(entry.id, 'trigger-table'))}
+            >
+              <Icon name="download" size={14} /> 导出触发键位表
+            </button>
+            <span className="library-menu__sep" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="library-menu__item library-menu__item--danger"
+              onClick={() => runMenuAction(() => void remove(entry))}
+            >
+              <Icon name="trash" size={14} /> 删除方案
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   // ---------------- 卡片 / 行渲染 ----------------
 
   const renderCard = (entry: LibraryEntry): JSX.Element => {
-    const badge = getSourceBadge(entry.sourceKind);
     const isCurrent = app.currentScore?.id === entry.id;
     const checked = selectedIds.has(entry.id);
+    const updated = formatDateTime(entry.updatedAt) || '未知时间';
+    const updatedDate = updated.slice(0, 10);
     return (
       <article
         key={entry.id}
-        className={`lb-card ${selectionMode ? 'is-selecting' : ''} ${checked ? 'is-checked' : ''} ${isCurrent ? 'is-current' : ''}`}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selectionMode ? checked : undefined}
-        aria-label={`${entry.title}，${selectionMode ? (checked ? '已选中，回车取消选择' : '未选中，回车选择') : '回车打开演奏台'}`}
-        onClick={() => activateEntry(entry)}
-        onKeyDown={(event) => handleEntryKeyDown(event, entry)}
+        className="card library-card"
+        aria-label={entry.title}
+        data-selected={checked ? 'true' : undefined}
+        onClick={(event) => handleSurfaceClick(event, entry)}
       >
-        <div className="lb-card-head">
-          <span className={`lb-source-badge tone-${badge.tone}`}>{badge.label}</span>
-          <div className="lb-card-head-side">
-            {isCurrent ? <span className="lb-current-chip">当前</span> : null}
-            {selectionMode ? (
-              <span className={`lb-check ${checked ? 'checked' : ''}`} aria-hidden="true">
-                {checked ? <Icon name="check" size={12} /> : null}
-              </span>
-            ) : (
-              renderStar(entry, 16)
-            )}
+        <div className="library-card__top">
+          <div className="library-card__badges">
+            <span className="badge" title={`来源：${sourceKindLabel(entry.sourceKind)}`}>
+              {getSourceLabel(entry.sourceKind)}
+            </span>
+            {isCurrent ? <span className="badge badge--accent">当前</span> : null}
           </div>
+          {selectionMode ? renderSelectToggle(entry, checked) : renderFavorite(entry)}
         </div>
 
-        <div className="lb-card-title-block">
-          <h3 className="lb-card-title">{entry.title}</h3>
-          <p className="lb-card-artist">{entry.artist || '未填写艺术家'}</p>
+        <div className="library-card__heading">
+          <button
+            type="button"
+            className="library-card__title"
+            title={entry.title}
+            aria-label={selectionMode ? `${checked ? '取消选择' : '选择'}《${entry.title}》` : `演奏《${entry.title}》`}
+            onClick={() => activateEntry(entry)}
+          >
+            {entry.title}
+          </button>
+          <p className="library-card__artist" title={entry.artist || undefined}>
+            {entry.artist || '未填写艺术家'}
+          </p>
         </div>
 
-        <div className="lb-card-meta">
-          <span className="lb-meta-item">
-            <Icon name="clock" size={12} /> {formatEntryDuration(entry)}
-          </span>
-          <span className="lb-meta-item">{entry.tempo} BPM</span>
-          <span className="lb-meta-item">1={keyLabel(entry.keyRoot)}</span>
-          <span className="lb-meta-item">
-            {entry.meter.num}/{entry.meter.den}
-          </span>
-          <span className="lb-meta-item">{entry.noteCount} 音符</span>
+        <div className="chip-row library-card__meta">
+          <Chip label="时长" value={formatEntryDuration(entry)} />
+          <Chip label="速度" value={`${entry.tempo} BPM`} />
+          <Chip label="调号" value={`1=${keyLabel(entry.keyRoot)}`} />
+          <Chip label="拍号" value={`${entry.meter.num}/${entry.meter.den}`} />
         </div>
 
-        <div className="lb-card-foot">
-          <span className="lb-updated" title={entry.updatedAt}>
-            更新于 {formatDateTime(entry.updatedAt) || '未知时间'}
+        <div className="library-card__foot">
+          <span className="library-card__updated" title={updated}>
+            更新于 {updatedDate}
           </span>
           {selectionMode ? null : (
-            <>
-              <div className="lb-quick-actions">
-                <button
-                  type="button"
-                  className="lb-quick-btn accent"
-                  title="打开演奏台"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEntry(entry, 'play');
-                  }}
-                >
-                  <Icon name="play" size={12} /> 演奏
-                </button>
-                <button
-                  type="button"
-                  className="lb-quick-btn"
-                  title="在编辑器中打开"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEntry(entry, 'editor');
-                  }}
-                >
-                  <Icon name="edit" size={12} /> 编辑
-                </button>
-              </div>
+            <div className="library-card__actions">
+              <button
+                type="button"
+                className="btn btn--sm"
+                title={`打开演奏台并载入《${entry.title}》`}
+                aria-label={`演奏《${entry.title}》`}
+                onClick={() => openEntry(entry, 'play')}
+              >
+                <Icon name="play" size={13} /> 演奏
+              </button>
               {renderMenu(entry)}
-            </>
+            </div>
           )}
         </div>
       </article>
@@ -542,77 +633,70 @@ export function LibraryPage(): JSX.Element {
   };
 
   const renderRow = (entry: LibraryEntry): JSX.Element => {
-    const badge = getSourceBadge(entry.sourceKind);
     const isCurrent = app.currentScore?.id === entry.id;
     const checked = selectedIds.has(entry.id);
+    const updated = formatDateTime(entry.updatedAt) || '未知时间';
     return (
       <div
         key={entry.id}
-        className={`lb-row ${selectionMode ? 'is-selecting' : ''} ${checked ? 'is-checked' : ''} ${isCurrent ? 'is-current' : ''}`}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selectionMode ? checked : undefined}
-        aria-label={`${entry.title}，${selectionMode ? (checked ? '已选中，回车取消选择' : '未选中，回车选择') : '回车打开演奏台'}`}
-        onClick={() => activateEntry(entry)}
-        onKeyDown={(event) => handleEntryKeyDown(event, entry)}
+        className="library-row"
+        data-selected={checked ? 'true' : undefined}
+        onClick={(event) => handleSurfaceClick(event, entry)}
       >
-        <div className="lb-row-side">
-          {selectionMode ? (
-            <span className={`lb-check ${checked ? 'checked' : ''}`} aria-hidden="true">
-              {checked ? <Icon name="check" size={12} /> : null}
+        <div className="library-row__side">
+          {selectionMode ? renderSelectToggle(entry, checked) : renderFavorite(entry)}
+        </div>
+
+        <div className="library-row__main">
+          <div className="library-row__title-line">
+            <button
+              type="button"
+              className="library-row__title"
+              title={entry.title}
+              aria-label={selectionMode ? `${checked ? '取消选择' : '选择'}《${entry.title}》` : `演奏《${entry.title}》`}
+              onClick={() => activateEntry(entry)}
+            >
+              {entry.title}
+            </button>
+            <span className="badge" title={`来源：${sourceKindLabel(entry.sourceKind)}`}>
+              {getSourceLabel(entry.sourceKind)}
             </span>
-          ) : (
-            renderStar(entry, 15)
-          )}
-        </div>
-
-        <div className="lb-row-main">
-          <div className="lb-row-title-line">
-            <span className="lb-row-title">{entry.title}</span>
-            <span className={`lb-source-badge tone-${badge.tone}`}>{badge.label}</span>
-            {isCurrent ? <span className="lb-current-chip">当前</span> : null}
+            {isCurrent ? <span className="badge badge--accent">当前</span> : null}
           </div>
-          <p className="lb-row-artist">{entry.artist || '未填写艺术家'}</p>
+          <p className="library-row__artist" title={entry.artist || undefined}>
+            {entry.artist || '未填写艺术家'}
+          </p>
         </div>
 
-        <div className="lb-row-meta">
-          <span>{formatEntryDuration(entry)}</span>
+        <div className="library-row__meta">
+          <span>
+            <span className="sr-only">时长 </span>
+            {formatEntryDuration(entry)}
+          </span>
           <span>{entry.tempo} BPM</span>
           <span>1={keyLabel(entry.keyRoot)}</span>
           <span>
             {entry.meter.num}/{entry.meter.den}
           </span>
-          <span>{entry.noteCount} 音符</span>
+          <span>{entry.noteCount} 音</span>
         </div>
 
-        <div className="lb-row-updated">{formatDateTime(entry.updatedAt) || '未知时间'}</div>
+        <div className="library-row__updated" title={updated}>
+          <span className="sr-only">更新于 </span>
+          {updated}
+        </div>
 
-        <div className="lb-row-actions">
+        <div className="library-row__actions">
           {selectionMode ? null : (
             <>
               <button
                 type="button"
-                className="lb-icon-btn"
-                title="演奏"
+                className="btn btn--icon btn--sm btn--quiet"
                 aria-label={`演奏《${entry.title}》`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEntry(entry, 'play');
-                }}
+                title="演奏"
+                onClick={() => openEntry(entry, 'play')}
               >
                 <Icon name="play" size={15} />
-              </button>
-              <button
-                type="button"
-                className="lb-icon-btn"
-                title="编辑"
-                aria-label={`编辑《${entry.title}》`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEntry(entry, 'editor');
-                }}
-              >
-                <Icon name="edit" size={15} />
               </button>
               {renderMenu(entry)}
             </>
@@ -624,297 +708,237 @@ export function LibraryPage(): JSX.Element {
 
   // ---------------- 页面 ----------------
 
+  const emptyLibrary = app.entries.length === 0;
   const dirtyScore = app.dirty ? app.currentScore : null;
 
   return (
-    <div className="page lb-page" onClick={handlePageClick}>
+    <div className="page library-page">
       <PageHeader
         title="音乐方案库"
-        subtitle={`已收录 ${stats.total} 个演奏方案 · ${stats.favorites} 个收藏 · 全部保存在本机用户数据目录`}
+        subtitle="保存在本机用户数据目录"
         actions={
           <>
-            <button type="button" className="button ghost" onClick={() => void importFiles()} disabled={importing}>
-              <Icon name="import" size={15} /> {importing ? '导入中…' : '导入文件'}
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={() => void importFiles()}
+              disabled={importing}
+              title="从文件导入 MIDI / 音频 / 简谱 / 方案 JSON"
+            >
+              <Icon name="import" size={14} /> {importing ? '导入中…' : '导入文件'}
             </button>
-            <button type="button" className="button primary" onClick={newScore}>
-              <Icon name="plus" size={15} /> 新建曲谱
+            <button type="button" className="btn btn--primary btn--sm" onClick={newScore}>
+              <Icon name="plus" size={14} /> 新建曲谱
             </button>
           </>
         }
       />
 
       {dirtyScore ? (
-        <div className="lb-dirty-banner">
-          <Icon name="warning" size={16} />
-          <div className="lb-dirty-text">
-            <strong>当前有未保存的修改</strong>
-            <span>《{dirtyScore.meta.title}》尚未保存，离开或切换曲谱前建议先保存。</span>
-          </div>
-          <div className="lb-dirty-actions">
-            <button type="button" className="button ghost small" onClick={() => app.navigate('editor')}>
-              继续编辑
-            </button>
-            <button type="button" className="button primary small" onClick={() => void app.saveCurrentScore()}>
-              <Icon name="check" size={13} /> 保存
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <section className="lb-stats" aria-label="方案库统计">
-        <div className="lb-stat">
-          <span className="lb-stat-icon">
-            <Icon name="library" size={16} />
-          </span>
-          <div className="lb-stat-text">
-            <strong className="lb-stat-value">{stats.total}</strong>
-            <span className="lb-stat-label">方案总数</span>
-          </div>
-        </div>
-        <div className="lb-stat">
-          <span className="lb-stat-icon tone-warn">
-            <Icon name="star" size={16} />
-          </span>
-          <div className="lb-stat-text">
-            <strong className="lb-stat-value">{stats.favorites}</strong>
-            <span className="lb-stat-label">收藏</span>
-          </div>
-        </div>
-        <div className="lb-stat">
-          <span className="lb-stat-icon tone-cyan">
-            <Icon name="import" size={16} />
-          </span>
-          <div className="lb-stat-text">
-            <strong className="lb-stat-value">{stats.imported}</strong>
-            <span className="lb-stat-label">导入曲谱</span>
-          </div>
-        </div>
-        <div className="lb-stat">
-          <span className="lb-stat-icon tone-ok">
-            <Icon name="music" size={16} />
-          </span>
-          <div className="lb-stat-text">
-            <strong className="lb-stat-value">{stats.notes.toLocaleString('zh-CN')}</strong>
-            <span className="lb-stat-label">音符总数</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="lb-toolbar" aria-label="搜索、筛选与视图">
-        <label className="lb-search">
-          <Icon name="target" size={15} />
-          <input
-            ref={searchRef}
-            className="lb-search-input"
-            placeholder="搜索标题或艺术家…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                setSearch('');
-                searchRef.current?.blur();
-              }
-            }}
-          />
-          {search ? (
-            <button
-              type="button"
-              className="lb-search-clear"
-              title="清空搜索"
-              aria-label="清空搜索"
-              onClick={() => {
-                setSearch('');
-                searchRef.current?.focus();
-              }}
-            >
-              <Icon name="close" size={13} />
-            </button>
-          ) : (
-            <kbd className="lb-search-kbd" title="按 / 快速搜索">
-              /
-            </kbd>
-          )}
-        </label>
-
-        <div className="lb-filter" role="group" aria-label="筛选方案">
-          {FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`lb-filter-chip ${filter === option.id ? 'active' : ''}`}
-              aria-pressed={filter === option.id}
-              onClick={() => setFilter(option.id)}
-            >
-              {option.label}
-              <span className="lb-filter-count">{filterCounts[option.id]}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="lb-toolbar-right">
-          <select
-            className="select lb-sort"
-            value={sort}
-            aria-label="排序方式"
-            onChange={(event) => setSort(event.target.value as SortKind)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <div className="lb-view-toggle" role="group" aria-label="视图切换">
-            <button
-              type="button"
-              className={`lb-view-btn ${view === 'grid' ? 'active' : ''}`}
-              title="网格视图"
-              aria-label="网格视图"
-              aria-pressed={view === 'grid'}
-              onClick={() => setView('grid')}
-            >
-              <GridViewIcon />
-            </button>
-            <button
-              type="button"
-              className={`lb-view-btn ${view === 'list' ? 'active' : ''}`}
-              title="列表视图"
-              aria-label="列表视图"
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
-            >
-              <ListViewIcon />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className={`lb-tool-icon ${refreshing ? 'is-busy' : ''}`}
-            title="刷新方案库"
-            aria-label="刷新方案库"
-            onClick={() => void refresh()}
-          >
-            <Icon name="refresh" size={15} className={refreshing ? 'lb-spin' : ''} />
-          </button>
-          <button
-            type="button"
-            className={`lb-tool-icon ${selectionMode ? 'active' : ''}`}
-            title={selectionMode ? '退出批量管理' : '批量管理（多选收藏/删除）'}
-            aria-label={selectionMode ? '退出批量管理' : '批量管理'}
-            aria-pressed={selectionMode}
-            onClick={toggleSelectionMode}
-          >
-            <Icon name="check" size={15} />
-          </button>
-        </div>
-      </section>
-
-      {recentEntries.length > 0 ? (
-        <section className="lb-recent" aria-label="最近更新">
-          <div className="lb-recent-head">
-            <Icon name="clock" size={14} /> 最近更新
-          </div>
-          <div className="lb-recent-list">
-            {recentEntries.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                className="lb-recent-item"
-                title={`打开《${entry.title}》演奏台`}
-                onClick={() => openEntry(entry, 'play')}
-              >
-                <span className="lb-recent-mark">
-                  <Icon name="music" size={14} />
-                </span>
-                <span className="lb-recent-text">
-                  <strong>{entry.title}</strong>
-                  <span>
-                    {formatEntryDuration(entry)} · {formatDateTime(entry.updatedAt) || '未知时间'}
-                  </span>
-                </span>
-                <Icon name="play" size={13} />
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {app.entries.length === 0 ? (
-        <EmptyState
-          icon={<Icon name="library" size={34} />}
-          title="方案库还是空的"
-          description="导入 MIDI / 音频 / 简谱文本，或直接新建一个曲谱开始。所有方案都保存在本机，可随时导出备份。"
+        <Notice
+          tone="warn"
+          title="当前有未保存的修改"
+          icon={<Icon name="warning" size={15} />}
           actions={
             <>
-              <button type="button" className="button primary" onClick={() => void importFiles()} disabled={importing}>
-                <Icon name="import" size={15} /> {importing ? '导入中…' : '导入曲谱文件'}
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => app.navigate('editor')}>
+                继续编辑
               </button>
-              <button type="button" className="button ghost" onClick={newScore}>
-                <Icon name="plus" size={15} /> 新建曲谱
+              <button type="button" className="btn btn--sm" onClick={() => void app.saveCurrentScore()}>
+                <Icon name="save" size={13} /> 保存修改
               </button>
-              <button type="button" className="button ghost" onClick={() => app.navigate('import')}>
-                <Icon name="sparkle" size={15} /> 去智能导入
+            </>
+          }
+        >
+          《{dirtyScore.meta.title}》的修改会随切换曲谱丢失。
+        </Notice>
+      ) : null}
+
+      {emptyLibrary ? null : (
+        <div className="library-tools">
+          <div className="library-tools__row">
+            <div className="library-search">
+              <Icon name="search" size={15} className="library-search__icon" />
+              <input
+                ref={searchRef}
+                type="search"
+                className="input library-search__input"
+                aria-label="搜索方案标题或艺术家"
+                placeholder="搜索标题或艺术家"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape') return;
+                  event.stopPropagation();
+                  setSearch('');
+                  searchRef.current?.blur();
+                }}
+              />
+              {search ? (
+                <button
+                  type="button"
+                  className="btn btn--icon btn--sm btn--quiet library-search__clear"
+                  aria-label="清除搜索"
+                  title="清除搜索"
+                  onClick={() => {
+                    setSearch('');
+                    searchRef.current?.focus();
+                  }}
+                >
+                  <Icon name="close" size={14} />
+                </button>
+              ) : (
+                <kbd className="library-search__hint" title="按 / 聚焦搜索">
+                  /
+                </kbd>
+              )}
+            </div>
+
+            <div className="segmented library-view" role="group" aria-label="视图切换">
+              <button
+                type="button"
+                className="segmented__item"
+                aria-pressed={view === 'grid'}
+                aria-label="网格视图"
+                title="网格视图"
+                onClick={() => setView('grid')}
+              >
+                <Icon name="grid" size={15} />
+              </button>
+              <button
+                type="button"
+                className="segmented__item"
+                aria-pressed={view === 'list'}
+                aria-label="列表视图"
+                title="列表视图"
+                onClick={() => setView('list')}
+              >
+                <Icon name="list" size={15} />
+              </button>
+            </div>
+          </div>
+
+          <div className="library-tools__row">
+            <div className="segmented" role="group" aria-label="筛选方案">
+              {FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="segmented__item"
+                  aria-pressed={filter === option.id}
+                  aria-label={`${option.label}，${filterCounts[option.id]} 个方案`}
+                  title={`${option.label} · ${filterCounts[option.id]} 个`}
+                  onClick={() => setFilter(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="library-tools__end">
+              <select
+                className="select compact"
+                value={sort}
+                aria-label="排序方式"
+                title="排序方式"
+                onChange={(event) => setSort(event.target.value as SortKind)}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="btn btn--icon btn--sm btn--quiet"
+                aria-label="刷新方案库"
+                aria-busy={refreshing}
+                title="刷新方案库"
+                disabled={refreshing}
+                onClick={() => void refresh()}
+              >
+                <Icon name="refresh" size={15} className={refreshing ? 'library-spin' : ''} />
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn--icon btn--sm btn--quiet ${selectionMode ? 'is-active' : ''}`}
+                aria-label={selectionMode ? '退出批量管理' : '批量管理'}
+                aria-pressed={selectionMode}
+                title={selectionMode ? '退出批量管理' : '批量管理（多选收藏或删除）'}
+                onClick={toggleSelectionMode}
+              >
+                <Icon name={selectionMode ? 'checkbox' : 'checkbox-blank'} size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {emptyLibrary ? (
+        <EmptyState
+          icon={<Icon name="library" size={20} />}
+          title="方案库还是空的"
+          description="从 MIDI、音频或简谱文本导入，也可以直接新建一份曲谱；所有方案都保存在本机，可随时导出备份。"
+          actions={
+            <>
+              <button type="button" className="btn btn--primary btn--sm" onClick={newScore}>
+                <Icon name="plus" size={14} /> 新建曲谱
+              </button>
+              <button type="button" className="btn btn--sm" onClick={() => app.navigate('import')}>
+                <Icon name="import" size={14} /> 智能导入
               </button>
             </>
           }
         />
       ) : visibleEntries.length === 0 ? (
         <EmptyState
-          icon={<Icon name="target" size={34} />}
-          title="没有匹配的方案"
+          icon={<Icon name="search" size={20} />}
+          title="没有找到方案"
           description={
             isFiltering
-              ? `没有找到符合当前${search.trim() ? `关键词「${search.trim()}」` : ''}${
-                  search.trim() && filter !== 'all' ? '和' : ''
-                }筛选条件的方案，试试换个关键词或筛选条件。`
-              : '当前筛选条件下没有方案。'
+              ? '没有符合当前搜索或筛选条件的方案，清除条件后可以查看全部方案。'
+              : '当前条件下没有方案。'
           }
           actions={
-            <>
-              <button type="button" className="button primary" onClick={resetFilters}>
-                <Icon name="close" size={15} /> 清除搜索与筛选
-              </button>
-              <button type="button" className="button ghost" onClick={() => void importFiles()} disabled={importing}>
-                <Icon name="import" size={15} /> 导入文件
-              </button>
-            </>
+            <button type="button" className="btn btn--sm" onClick={resetFilters}>
+              <Icon name="close" size={14} /> 清除搜索与筛选
+            </button>
           }
         />
+      ) : view === 'grid' ? (
+        <div className="library-cards">{visibleEntries.map(renderCard)}</div>
       ) : (
-        <div className="lb-results" ref={menuRootRef}>
-          {view === 'grid' ? (
-            <div className="lb-grid">{visibleEntries.map(renderCard)}</div>
-          ) : (
-            <div className="lb-list">
-              <div className="lb-list-head" aria-hidden="true">
-                <span />
-                <span>方案</span>
-                <span>参数</span>
-                <span>更新时间</span>
-                <span>操作</span>
-              </div>
-              {visibleEntries.map(renderRow)}
-            </div>
-          )}
+        <div className="card card--flush library-list">
+          <div className="library-list__head" aria-hidden="true">
+            <span />
+            <span>方案</span>
+            <span>参数</span>
+            <span>更新时间</span>
+            <span className="library-list__head-end">操作</span>
+          </div>
+          {visibleEntries.map(renderRow)}
         </div>
       )}
 
       {selectionMode ? (
-        <div className="lb-selection-bar">
-          <span className="lb-selection-count">
-            <Icon name="check" size={14} /> 已选 {selectedCount} 个方案
+        <div className="card library-selection" role="group" aria-label="批量操作">
+          <span className="library-selection__count">
+            <span className="badge badge--accent">已选 {selectedCount}</span>
+            <span className="library-selection__label">个方案</span>
           </span>
-          <div className="lb-selection-actions">
-            <button type="button" className="button ghost small" onClick={selectAllVisible}>
-              全选筛选结果
+          <div className="library-selection__actions">
+            <button type="button" className="btn btn--sm" onClick={selectAllVisible} disabled={visibleEntries.length === 0}>
+              全选结果
             </button>
-            <button type="button" className="button ghost small" onClick={clearSelection} disabled={selectedCount === 0}>
+            <button type="button" className="btn btn--sm" onClick={clearSelection} disabled={selectedCount === 0}>
               清空
             </button>
             <button
               type="button"
-              className="button ghost small"
+              className="btn btn--sm"
               disabled={selectedCount === 0}
               onClick={() => void batchFavorite(true)}
             >
@@ -922,16 +946,21 @@ export function LibraryPage(): JSX.Element {
             </button>
             <button
               type="button"
-              className="button ghost small"
+              className="btn btn--sm"
               disabled={selectedCount === 0}
               onClick={() => void batchFavorite(false)}
             >
               取消收藏
             </button>
-            <button type="button" className="button danger small" disabled={selectedCount === 0} onClick={() => void batchRemove()}>
+            <button
+              type="button"
+              className="btn btn--danger btn--sm"
+              disabled={selectedCount === 0}
+              onClick={() => void batchRemove()}
+            >
               <Icon name="trash" size={13} /> 删除
             </button>
-            <button type="button" className="button primary small" onClick={toggleSelectionMode}>
+            <button type="button" className="btn btn--sm" onClick={toggleSelectionMode}>
               完成
             </button>
           </div>

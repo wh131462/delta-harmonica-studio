@@ -119,17 +119,24 @@ export function PerformanceProvider({ children }: { children: ReactNode }): JSX.
       app.showToast('warning', '当前乐谱没有可演奏的音符');
       return;
     }
-    if (app.settings.input.backend === 'software' && !app.settings.input.targetWindowHandle) {
+    // macOS / Linux 没有 Win32 注入链路：不拦截开始，而是自动以排练模式走完时间轴。
+    const canInject = app.appInfo?.capabilities.gameInjection ?? true;
+    const backend = app.settings.input.backend === 'software' && !canInject ? 'dry-run' : app.settings.input.backend;
+    const forcedRehearsal = backend === 'dry-run' && app.settings.input.backend === 'software';
+    if (backend === 'software' && !app.settings.input.targetWindowHandle) {
       app.showToast('warning', '请先选择「三角洲行动」游戏窗口，再开始演奏');
       return;
     }
-    if (app.settings.input.backend === 'software' && app.appInfo && !app.appInfo.elevated) {
+    if (backend === 'software' && app.appInfo && !app.appInfo.elevated) {
       app.showToast('warning', '未以管理员权限运行：游戏会静默丢弃注入的按键。请点击「以管理员重启」。');
       return;
     }
     if (requiresMouseFire && !confirmSafety && !app.appInfo?.gameAutoplay) {
       app.showToast('warning', '本谱需要按下鼠标左/右键（游戏中为开火/开镜），请先勾选安全确认');
       return;
+    }
+    if (forcedRehearsal) {
+      app.showToast('info', '当前平台不支持游戏注入：本次以排练模式走时间轴，不会发送任何按键');
     }
     preview.stop();
     setStarting(true);
@@ -140,8 +147,8 @@ export function PerformanceProvider({ children }: { children: ReactNode }): JSX.
         countdownSeconds: app.settings.input.countdownSeconds,
         focusGuard: app.settings.input.focusGuard,
         autoFocusTarget: app.settings.input.autoFocusTarget,
-        targetWindowHandle: app.settings.input.targetWindowHandle,
-        backend: app.settings.input.backend,
+        targetWindowHandle: backend === 'software' ? app.settings.input.targetWindowHandle : null,
+        backend,
         title: score?.meta.title ?? '未命名',
       });
       if (!result.ok) app.showToast('warning', result.message ?? '未能开始演奏');

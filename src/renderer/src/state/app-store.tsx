@@ -11,7 +11,7 @@ import type {
 import type { Score } from '@core/model/score';
 import { DEFAULT_SETTINGS, mergeSettings } from '@shared/settings';
 
-export type PageId = 'play' | 'editor' | 'import' | 'library' | 'settings';
+export type PageId = 'play' | 'practice' | 'editor' | 'import' | 'library' | 'settings';
 
 export interface ToastMessage {
   id: number;
@@ -38,7 +38,8 @@ export interface AppStore {
   refreshLibrary(): Promise<void>;
   openScore(id: string, page?: PageId): Promise<void>;
   setCurrentScore(score: Score | null, dirty?: boolean): void;
-  saveCurrentScore(): Promise<Score | null>;
+  /** 传入 score 时保存该快照（编辑器用），否则保存 store 里的当前曲谱 */
+  saveCurrentScore(score?: Score): Promise<Score | null>;
   deleteScore(id: string): Promise<void>;
   toggleFavorite(id: string): Promise<void>;
   updateSettings(patch: Partial<AppSettings>): Promise<void>;
@@ -51,7 +52,7 @@ export interface AppStore {
 
 const AppStoreContext = createContext<AppStore | null>(null);
 
-const PAGES: PageId[] = ['play', 'editor', 'import', 'library', 'settings'];
+const PAGES: PageId[] = ['play', 'practice', 'editor', 'import', 'library', 'settings'];
 
 export function AppProvider({ children }: { children: ReactNode }): JSX.Element {
   const [ready, setReady] = useState(false);
@@ -126,14 +127,16 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
     [showToast],
   );
 
-  const saveCurrentScore = useCallback(async (): Promise<Score | null> => {
-    if (!currentScore) return null;
+  const saveCurrentScore = useCallback(async (score?: Score): Promise<Score | null> => {
+    const target = score ?? currentScore;
+    if (!target) return null;
     try {
-      await window.api.library.save(currentScore);
+      await window.api.library.save(target);
+      setCurrentScoreState(target);
       await refreshLibrary();
       setDirty(false);
-      showToast('success', `已保存《${currentScore.meta.title}》`);
-      return currentScore;
+      showToast('success', `已保存《${target.meta.title}》`);
+      return target;
     } catch (error) {
       showToast('error', `保存失败：${error instanceof Error ? error.message : String(error)}`);
       return null;

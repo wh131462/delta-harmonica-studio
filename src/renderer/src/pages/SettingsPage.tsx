@@ -1,28 +1,34 @@
 /**
- * 设置与校准页面（分 Tab 重构版）
+ * 设置与校准页面
  * ------------------------------------------------------------------
- * Tab 结构：
- *  1. 输入与权限：管理员权限横幅、输入方式、目标窗口、输入通道自检、演奏安全选项
- *  2. 演奏时序：5 个毫秒参数 + 时序示意 + 调参建议 + 恢复默认
- *  3. 快捷键：4 个全局动作的录制/保存/注册状态展示（HotkeyRecorder）
- *  4. 悬浮窗与外观：显隐、置顶、透明度、快捷键提示、重置位置、试听音色与音量
- *  5. 音频分析：主旋律提取模式、音域、最短音符、伴奏抑制、量化网格、自动调性
- *  6. 风险与关于：风险声明、官方公告、版本信息、数据目录、口琴键位表
+ * 结构：PageHeader（标题 + 打开数据目录）
+ *      → 管理员权限提示（全页唯一一处，只在这里解释提权与豁免）
+ *      → 6 个 tab：输入与权限 / 演奏时序 / 快捷键 / 悬浮窗与外观 / 音频分析 / 风险与关于
+ *      → 每个 tab 1–2 张卡片；设置行统一为「左侧标签 + 说明 / 右侧控件」
  *
  * 约定：
- * - 所有设置改动即时写入 app.updateSettings（内部的 settings:update），并给出 toast；
- * - 页面级样式见 ../styles/settings.css（类名 st- 前缀）；
+ * - 所有设置改动即时写入 app.updateSettings（settings:update）并给出 toast；
+ * - 页面级样式见 ../styles/settings.css（类名 settings- 前缀），只组合组件库基元；
  * - 快捷键录制逻辑封装在 @renderer/components/HotkeyRecorder。
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { DEFAULT_TIMING } from '@core/instrument/plan';
 import { DEFAULT_HARMONICA } from '@core/model/instrument';
 import { midiToName } from '@core/model/pitch';
 import { HotkeyRecorder, formatAccelerator } from '@renderer/components/HotkeyRecorder';
 import { Icon, type IconName } from '@renderer/components/Icon';
-import { PageHeader } from '@renderer/components/PageHeader';
+import { Chip, Notice, PageHeader } from '@renderer/components/PageHeader';
 import { useAppStore } from '@renderer/state/app-store';
-import { DEFAULT_SETTINGS, describeInputReadiness } from '@shared/settings';
+import { DEFAULT_SETTINGS } from '@shared/settings';
 import type {
   AudioAnalysisSettings,
   HotkeyAction,
@@ -47,28 +53,27 @@ type SettingsTabId = 'input' | 'timing' | 'hotkeys' | 'overlay' | 'audio' | 'abo
 interface SettingsTabDef {
   id: SettingsTabId;
   label: string;
-  icon: IconName;
 }
 
 const TABS: SettingsTabDef[] = [
-  { id: 'input', label: '输入与权限', icon: 'shield' },
-  { id: 'timing', label: '演奏时序', icon: 'clock' },
-  { id: 'hotkeys', label: '快捷键', icon: 'settings' },
-  { id: 'overlay', label: '悬浮窗与外观', icon: 'overlay' },
-  { id: 'audio', label: '音频分析', icon: 'music' },
-  { id: 'about', label: '风险与关于', icon: 'warning' },
+  { id: 'input', label: '输入与权限' },
+  { id: 'timing', label: '演奏时序' },
+  { id: 'hotkeys', label: '快捷键' },
+  { id: 'overlay', label: '悬浮窗与外观' },
+  { id: 'audio', label: '音频分析' },
+  { id: 'about', label: '风险与关于' },
 ];
 
 const INPUT_BACKEND_OPTIONS: Array<{ id: InputBackend; label: string; description: string; disabled?: boolean }> = [
   {
     id: 'software',
     label: '模拟按键注入游戏（推荐）',
-    description: '通过 Win32 SendInput 向目标窗口发送真实键鼠事件；需要管理员权限才能注入游戏。',
+    description: '通过 Win32 SendInput 向目标窗口发送真实键鼠事件，是游戏内生效的正式模式。',
   },
   {
     id: 'dry-run',
     label: '排练模式（不发送按键）',
-    description: '只按时间轴走一遍流程，适合校准/录像前确认节奏，不会影响游戏。',
+    description: '只按时间轴走一遍流程，适合校准、录像前确认节奏，不会影响游戏。',
   },
   {
     id: 'serial',
@@ -77,12 +82,6 @@ const INPUT_BACKEND_OPTIONS: Array<{ id: InputBackend; label: string; descriptio
     disabled: true,
   },
 ];
-
-const INPUT_BACKEND_LABEL: Record<InputBackend, string> = {
-  software: '游戏注入',
-  'dry-run': '排练模式',
-  serial: '串口硬件',
-};
 
 interface HotkeyMeta {
   label: string;
@@ -172,22 +171,22 @@ const TIMING_FIELDS: TimingFieldDef[] = [
   },
 ];
 
-const MELODY_MODE_OPTIONS: Array<{ id: MelodyAnalysisMode; name: string; description: string }> = [
-  { id: 'auto', name: '自动判断', description: '分析音频复音程度，自动选择单声部 / 复音策略（推荐）' },
-  { id: 'monophonic', name: '单声部', description: '清唱、独奏等单旋律音频，使用基频跟踪' },
-  { id: 'polyphonic', name: '复音 / 带伴奏', description: 'HPSS 分离伴奏 + 谐波显著度跟踪主旋律' },
+const MELODY_MODE_OPTIONS: Array<{ id: MelodyAnalysisMode; name: string }> = [
+  { id: 'auto', name: '自动判断' },
+  { id: 'monophonic', name: '单声部' },
+  { id: 'polyphonic', name: '复音' },
 ];
 
-const PREVIEW_INSTRUMENTS: Array<{ id: PreviewInstrument; name: string; description: string }> = [
-  { id: 'harmonica', name: '口琴', description: '簧片泛音，接近游戏内听感' },
-  { id: 'piano', name: '钢琴', description: '干净音头，便于核对音高与节奏' },
+const PREVIEW_INSTRUMENTS: Array<{ id: PreviewInstrument; name: string }> = [
+  { id: 'harmonica', name: '口琴' },
+  { id: 'piano', name: '钢琴' },
 ];
 
 const PITCH_MIN = 48;
 const PITCH_MAX = 84;
 
 const PITCH_PRESETS: Array<{ label: string; min: number; max: number }> = [
-  { label: 'C3 – C6（默认）', min: 48, max: 84 },
+  { label: 'C3 – C6', min: 48, max: 84 },
   { label: 'C4 – C6', min: 60, max: 84 },
   { label: 'C3 – C5', min: 48, max: 72 },
 ];
@@ -213,9 +212,36 @@ const OFFICIAL_LINKS = [
   },
 ];
 
+/**
+ * 输入自检里这些信息已在页面其它位置呈现（顶部权限提示 / 目标窗口行 / 页面其他 tab），
+ * 不再在自检明细里重复第二遍。
+ */
+const DUPLICATED_CHECK_PATTERNS = [/管理员/, /提权/, /UIPI/, /尚未选择目标游戏窗口/, /串口 \/ Arduino/];
+
+type CheckTone = 'ok' | 'warn' | 'danger' | 'muted';
+
+interface CheckConclusion {
+  tone: CheckTone;
+  title: string;
+  hint?: string;
+}
+
+interface CheckFact {
+  label: string;
+  value: string;
+  tone: CheckTone;
+}
+
 /** 把错误对象转成可读文案 */
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** 自检结论 / 明细共用的色调图标 */
+function checkIcon(tone: CheckTone): IconName {
+  if (tone === 'ok') return 'check';
+  if (tone === 'warn' || tone === 'danger') return 'warning';
+  return 'info';
 }
 
 /* ============================================================
@@ -224,10 +250,11 @@ function errorText(error: unknown): string {
 
 export function SettingsPage(): JSX.Element {
   const app = useAppStore();
-  const { settings, appInfo, inputCheck, windows } = app;
-  const { showToast, updateSettings, refreshWindows, refreshInputCheck, setSelfTestOpen, overlayVisible } = app;
+  const { settings, appInfo, inputCheck, windows, overlayVisible } = app;
+  const { showToast, updateSettings, refreshWindows, refreshInputCheck, setSelfTestOpen } = app;
 
   const [tab, setTab] = useState<SettingsTabId>('input');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   /** 当前正在录制的动作（用于互斥其他录制器） */
   const [recordingAction, setRecordingAction] = useState<HotkeyAction | null>(null);
   /** 快捷键注册状态（来自主进程 globalShortcut） */
@@ -307,7 +334,7 @@ export function SettingsPage(): JSX.Element {
     }
   }, []);
 
-  // 首次进入设置页就拉一次注册状态（Tab 上有失败计数徽标）
+  // 首次进入设置页就拉一次注册状态
   useEffect(() => {
     void refreshHotkeyStatuses();
   }, [refreshHotkeyStatuses]);
@@ -364,7 +391,6 @@ export function SettingsPage(): JSX.Element {
     return map;
   }, [hotkeyStatuses]);
 
-  const registeredCount = hotkeyStatuses ? hotkeyStatuses.filter((item) => item.registered).length : 0;
   const failedCount = hotkeyStatuses ? hotkeyStatuses.filter((item) => !item.registered).length : 0;
 
   /** 客户端预检：两个动作录了同一个组合时提前提示 */
@@ -437,7 +463,9 @@ export function SettingsPage(): JSX.Element {
 
   const openExternal = useCallback(
     (url: string) => {
-      void window.api.shell.openExternal(url).catch((error: unknown) => showToast('error', `打开链接失败：${errorText(error)}`));
+      void window.api.shell
+        .openExternal(url)
+        .catch((error: unknown) => showToast('error', `打开链接失败：${errorText(error)}`));
     },
     [showToast],
   );
@@ -472,325 +500,445 @@ export function SettingsPage(): JSX.Element {
 
   /* ---------------- 派生数据 ---------------- */
 
-  const activeTab = TABS.find((item) => item.id === tab) ?? TABS[0];
-  const readiness = inputCheck ? describeInputReadiness(inputCheck) : null;
-  const currentBackend = INPUT_BACKEND_OPTIONS.find((option) => option.id === settings.input.backend);
-  const recordingLabel = recordingAction ? HOTKEY_META[recordingAction].label : null;
+  const elevated = Boolean(appInfo?.elevated);
+  const capabilities = appInfo?.capabilities;
+  /** 非 Windows 平台没有 Win32 注入链路：相关控件置灰并在结论里说明原因 */
+  const canInject = capabilities?.gameInjection ?? true;
+  const isRehearsal = settings.input.backend === 'dry-run';
+  const isSerial = settings.input.backend === 'serial';
+  const backendOptions = INPUT_BACKEND_OPTIONS.map((option) =>
+    option.id === 'software' && !canInject
+      ? {
+          ...option,
+          disabled: true,
+          label: '模拟按键注入游戏（仅 Windows 可用）',
+          description: `${capabilities?.label ?? '当前平台'} 版不发送真实按键；请使用排练模式，或改用 Windows 版演奏。`,
+        }
+      : option,
+  );
+  const currentBackend = backendOptions.find((option) => option.id === settings.input.backend);
+  const timing = settings.input.timing;
+  const targetTitle = settings.input.targetWindowTitle;
+
+  /** 快捷键卡片只在出现异常时给汇总徽标；正常情况下由每行的单项徽标说明状态，避免重复 */
+  const hotkeySummaryBadge: JSX.Element | null = hotkeyStatusError ? (
+    <span className="badge badge--warn">状态未知</span>
+  ) : hotkeyStatusLoading ? (
+    <span className="badge">检测中</span>
+  ) : failedCount > 0 ? (
+    <span className="badge badge--danger">{failedCount} 项失败</span>
+  ) : null;
+
+  /** 输入通道结论：先给结论，再给明细（管理员权限只在页面顶部提示一次） */
+  let checkConclusion: CheckConclusion;
+  if (!inputCheck) {
+    checkConclusion = { tone: 'muted', title: '正在读取输入通道状态…', hint: '点「重新检查」重试' };
+  } else if (!canInject) {
+    checkConclusion = {
+      tone: 'warn',
+      title: `${capabilities?.label ?? '当前平台'} 版不支持游戏注入`,
+      hint: '编辑、导入、练习、试听与宏导出可用；演奏会按排练模式走完时间轴',
+    };
+  } else if (isSerial) {
+    checkConclusion = { tone: 'warn', title: '串口硬件输出尚未启用', hint: '改用模拟按键注入或排练模式' };
+  } else if (isRehearsal) {
+    checkConclusion = { tone: 'ok', title: '排练模式就绪：只走时间轴，不发送按键' };
+  } else if (!inputCheck.helperAvailable) {
+    checkConclusion = {
+      tone: 'danger',
+      title: '按键桥接组件不可用',
+      hint: '重启应用或重新安装；排练模式仍可使用',
+    };
+  } else if (!settings.input.targetWindowHandle) {
+    checkConclusion = {
+      tone: 'warn',
+      title: '按键桥接可用 · 尚未选择目标窗口',
+      hint: '开始演奏前先在上方选择「三角洲行动」窗口',
+    };
+  } else {
+    checkConclusion = {
+      tone: 'ok',
+      title: `按键桥接可用 · 目标窗口：${targetTitle ?? '已选择'}`,
+    };
+  }
+
+  const checkFacts: CheckFact[] = [];
+  if (inputCheck) {
+    if (!canInject) {
+      checkFacts.push({
+        label: '平台',
+        value: `${capabilities?.label ?? inputCheck.platform}${appInfo?.arch ? ` · ${appInfo.arch}` : ''}`,
+        tone: 'muted',
+      });
+      checkFacts.push({ label: '游戏注入', value: '不支持（仅 Windows）', tone: 'warn' });
+      checkFacts.push({ label: '排练 / 练习', value: '可用', tone: 'ok' });
+    } else {
+      checkFacts.push({
+        label: '按键桥接',
+        value: inputCheck.helperAvailable ? '可用' : '不可用',
+        tone: inputCheck.helperAvailable ? 'ok' : 'danger',
+      });
+      if (isRehearsal) {
+        checkFacts.push({ label: '目标窗口', value: '排练模式不需要', tone: 'muted' });
+      } else if (settings.input.targetWindowHandle) {
+        checkFacts.push({ label: '目标窗口', value: targetTitle ?? '已选择', tone: 'ok' });
+      } else {
+        checkFacts.push({ label: '目标窗口', value: '未选择', tone: 'warn' });
+      }
+    }
+  }
+
+  // 提权相关与重复信息不再进自检明细，只在结论右侧保留一个短徽标
+  const checkWarnings = (inputCheck?.warnings ?? []).filter(
+    (warning) => !DUPLICATED_CHECK_PATTERNS.some((pattern) => pattern.test(warning)),
+  );
+  const showElevationBadge = Boolean(inputCheck) && canInject && !elevated && !isRehearsal && !isSerial;
 
   /** 渲染某个动作的注册状态徽标 */
   const renderHotkeyStatus = (action: HotkeyAction): JSX.Element => {
-    if (hotkeyStatusError) return <span className="st-badge">状态未知</span>;
+    if (hotkeyStatusError) return <span className="badge badge--warn">状态未知</span>;
     const status = statusByAction.get(action);
-    if (!status) return <span className="st-badge">{hotkeyStatusLoading ? '检测中…' : '未检测'}</span>;
-    if (status.registered) {
-      return (
-        <span className="st-badge ok">
-          <Icon name="check" size={11} /> 已生效
-        </span>
-      );
-    }
+    if (!status) return <span className="badge">{hotkeyStatusLoading ? '检测中' : '未检测'}</span>;
+    if (status.registered) return <span className="badge badge--ok">已生效</span>;
     return (
       <>
-        <span className="st-badge danger">
-          <Icon name="warning" size={11} /> 注册失败
-        </span>
-        {status.error ? <span className="st-hotkey-error">{status.error}</span> : null}
+        <span className="badge badge--danger">注册失败</span>
+        {status.error ? <span className="settings-hotkey__error">{status.error}</span> : null}
       </>
     );
+  };
+
+  /* ---------------- Tab 键盘导航（Tablist 规范：左右方向键切换，Home / End 跳到首尾） ---------------- */
+
+  const focusTab = (index: number) => {
+    setTab(TABS[index].id);
+    tabRefs.current[index]?.focus();
+  };
+
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = TABS.findIndex((item) => item.id === tab);
+    if (currentIndex < 0) return;
+    let nextIndex: number;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % TABS.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = TABS.length - 1;
+    else return;
+    event.preventDefault();
+    focusTab(nextIndex);
   };
 
   /* ============================================================
      Tab 1：输入与权限
      ============================================================ */
   const inputTab = (
-    <div className="st-panel">
-      <div className={`st-banner ${appInfo?.elevated ? 'ok' : 'warn'}`}>
-        <Icon name={appInfo?.elevated ? 'check' : 'warning'} size={19} />
-        <div className="st-banner-text">
-          <strong>{appInfo?.elevated ? '已以管理员权限运行' : '当前不是管理员权限'}</strong>
-          <p>
-            游戏进程以管理员（High 完整性）运行，Windows 的 UIPI 会<em>静默丢弃</em>低权限进程的模拟按键，因此注入游戏必须提权。
-            排练模式与应用内试听不受影响。
-          </p>
-          {appInfo && !appInfo.elevated ? (
-            <div className="st-banner-actions">
-              <button type="button" className="button primary small" onClick={() => void handleRelaunch()} disabled={elevating}>
-                <Icon name="shield" size={14} /> {elevating ? '正在请求重启…' : '以管理员身份重启'}
-              </button>
-              <button type="button" className="button ghost small" onClick={openUserData}>
-                <Icon name="folder" size={14} /> 打开数据目录
-              </button>
-            </div>
-          ) : null}
+    <div className="settings-columns">
+      <SettingsCard title="输入通道">
+        <div className="settings-rows">
+          <SettingRow label="输入方式" description={currentBackend?.description} htmlFor="settings-input-backend">
+            <select
+              id="settings-input-backend"
+              className="select"
+              value={settings.input.backend}
+              aria-describedby="settings-input-backend-desc"
+              onChange={(event) => {
+                const backend = event.target.value as InputBackend;
+                const option = INPUT_BACKEND_OPTIONS.find((item) => item.id === backend);
+                patchInput({ backend }, `输入方式已切换为「${option?.label ?? backend}」`);
+              }}
+            >
+              {backendOptions.map((option) => (
+                <option key={option.id} value={option.id} disabled={option.disabled}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </SettingRow>
+
+          <SettingRow
+            label="目标游戏窗口"
+            description={
+              canInject
+                ? '先在 Windows 打开游戏并刷新列表；未选择时只能排练或试听。'
+                : `${capabilities?.label ?? '当前平台'} 版不支持游戏注入：目标窗口仅在 Windows 版可用。`
+            }
+            htmlFor="settings-target-window"
+          >
+            <select
+              id="settings-target-window"
+              className="select grow"
+              value={settings.input.targetWindowHandle ?? 0}
+              disabled={!canInject}
+              aria-describedby="settings-target-window-desc"
+              onChange={(event) => {
+                const handle = Number(event.target.value);
+                const info = windows.find((item) => item.handle === handle);
+                if (!handle) {
+                  patchInput({ targetWindowHandle: null, targetWindowTitle: null }, '已清除目标窗口');
+                  return;
+                }
+                patchInput(
+                  { targetWindowHandle: handle, targetWindowTitle: info?.title ?? null },
+                  `目标窗口已设为「${info?.title ?? handle}」`,
+                );
+              }}
+            >
+              <option value={0}>未选择（仅排练 / 试听）</option>
+              {windows.map((item) => (
+                <option key={item.handle} value={item.handle}>
+                  {`${item.title}${item.looksLikeGame ? ' · 疑似游戏' : ''}${item.isForeground ? ' · 前台' : ''}`}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn--icon"
+              title={canInject ? '刷新窗口列表' : '当前平台不支持游戏注入'}
+              aria-label="刷新窗口列表"
+              disabled={refreshingWindows || !canInject}
+              onClick={() => void handleRefreshWindows()}
+            >
+              <Icon name="refresh" size={15} />
+            </button>
+          </SettingRow>
         </div>
-      </div>
 
-      <div className="st-grid">
-        <section className="st-card">
-          <CardHead icon="target" title="输入方式与目标窗口" subtitle="按键事件发往哪里、以什么方式发送" />
-          <div className="st-fields">
-            <label className="field">
-              <span className="field-label">输入方式</span>
-              <select
-                className="select"
-                value={settings.input.backend}
-                onChange={(event) => {
-                  const backend = event.target.value as InputBackend;
-                  const option = INPUT_BACKEND_OPTIONS.find((item) => item.id === backend);
-                  patchInput({ backend }, `输入方式已切换为「${option?.label ?? backend}」`);
-                }}
-              >
-                {INPUT_BACKEND_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id} disabled={option.disabled}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <span className="hint-text">{currentBackend?.description}</span>
-            </label>
+        <hr className="divider" />
 
-            <label className="field">
-              <span className="field-label">目标游戏窗口</span>
-              <div className="field-inline">
-                <select
-                  className="select grow"
-                  value={settings.input.targetWindowHandle ?? 0}
-                  onChange={(event) => {
-                    const handle = Number(event.target.value);
-                    const info = windows.find((item) => item.handle === handle);
-                    if (!handle) {
-                      patchInput({ targetWindowHandle: null, targetWindowTitle: null }, '已清除目标窗口');
-                      return;
-                    }
-                    patchInput({ targetWindowHandle: handle, targetWindowTitle: info?.title ?? null }, `目标窗口已设为「${info?.title ?? handle}」`);
-                  }}
-                >
-                  <option value={0}>未选择（排练模式可跳过）</option>
-                  {windows.map((item) => (
-                    <option key={item.handle} value={item.handle}>
-                      {`${item.looksLikeGame ? '🎮 ' : ''}${item.title}${item.isForeground ? '（当前前台）' : ''}`}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="icon-button bordered"
-                  title="刷新窗口列表"
-                  onClick={() => void handleRefreshWindows()}
-                  disabled={refreshingWindows}
-                >
-                  <Icon name="refresh" size={15} />
-                </button>
-              </div>
-              <span className="hint-text">
-                先在 Windows 打开游戏，让它出现在列表中；点击刷新后选择标题含「三角洲行动」的窗口（共 {windows.length} 个窗口）。
-              </span>
-              {settings.input.targetWindowTitle ? (
-                <span className="hint-text">
-                  当前目标：{settings.input.targetWindowTitle}
-                  {settings.input.targetWindowHandle ? `（HWND ${settings.input.targetWindowHandle}）` : ''}
-                </span>
-              ) : null}
-            </label>
-          </div>
-
-          <div className="st-inline-actions">
-            <button type="button" className="button ghost small" onClick={() => setSelfTestOpen(true)}>
-              <Icon name="target" size={14} /> 输入通道自检
-            </button>
-            <button type="button" className="button ghost small" onClick={() => void handleRefreshCheck()} disabled={refreshingCheck}>
-              <Icon name="refresh" size={14} /> {refreshingCheck ? '检查中…' : '重新检查输入状态'}
-            </button>
-          </div>
-
-          {inputCheck && readiness ? (
-            <div className={`st-check ${readiness.level}`}>
-              <div className={`st-check-summary ${readiness.level}`}>
-                <Icon name={readiness.level === 'ok' ? 'check' : 'warning'} size={15} />
-                <span>{readiness.message}</span>
-              </div>
-              <div className="st-check-pills">
-                <span className={`st-pill ${inputCheck.elevated ? 'ok' : 'warn'}`}>
-                  管理员权限：{inputCheck.elevated ? '已获得' : '未获得'}
-                </span>
-                <span className={`st-pill ${inputCheck.helperAvailable ? 'ok' : 'danger'}`}>
-                  按键桥接：{inputCheck.helperAvailable ? '可用' : '不可用'}
-                </span>
-                <span className="st-pill">输入方式：{INPUT_BACKEND_LABEL[inputCheck.backend] ?? inputCheck.backend}</span>
-              </div>
-              {inputCheck.helperPath ? <p className="st-check-line">桥接组件：{inputCheck.helperPath}</p> : null}
-              {inputCheck.warnings.map((warning, index) => (
-                <p key={`warning-${index}`} className="st-check-line warn">
-                  <Icon name="warning" size={12} /> {warning}
-                </p>
-              ))}
-              {inputCheck.notes.map((note, index) => (
-                <p key={`note-${index}`} className="st-check-line note">
-                  <Icon name="check" size={12} /> {note}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="hint-text">正在等待输入通道状态…</p>
-          )}
-        </section>
-
-        <section className="st-card">
-          <CardHead icon="shield" title="演奏安全" subtitle="开始演奏前的保护性选项，建议全部保持开启" />
-          <div className="st-rows">
-            <ToggleRow
-              title="焦点保护"
-              description="目标窗口失去焦点时立即停止并释放所有按键（强烈建议开启）"
-              checked={settings.input.focusGuard}
-              onChange={(checked) => patchInput({ focusGuard: checked }, checked ? '焦点保护已开启' : '焦点保护已关闭')}
-            />
-            <ToggleRow
-              title="自动聚焦目标窗口"
-              description="开始演奏前尝试把目标窗口切到前台，避免按键发到错误窗口"
-              checked={settings.input.autoFocusTarget}
-              onChange={(checked) => patchInput({ autoFocusTarget: checked }, checked ? '自动聚焦已开启' : '自动聚焦已关闭')}
-            />
-            <ToggleRow
-              title="允许「八度 + 半音」组合"
-              description="开启后可吹出全部半音；若实机半音表现异常可关闭，按兼容模式排键"
-              checked={settings.input.allowModifierCombos}
-              onChange={(checked) => patchInput({ allowModifierCombos: checked }, checked ? '已允许八度 + 半音组合' : '已关闭组合键，使用兼容模式排键')}
-            />
-            <div className="st-row">
-              <div className="st-row-text">
-                <strong>开始前倒计时</strong>
-                <span>给切回游戏窗口留出准备时间</span>
-              </div>
-              <select
-                className="select st-select"
-                value={settings.input.countdownSeconds}
-                onChange={(event) => {
-                  const seconds = Number(event.target.value);
-                  patchInput({ countdownSeconds: seconds }, seconds === 0 ? '已关闭开始前倒计时' : `开始前倒计时已设为 ${seconds} 秒`);
-                }}
-              >
-                <option value={0}>不等待</option>
-                <option value={1}>1 秒</option>
-                <option value={3}>3 秒</option>
-                <option value={5}>5 秒</option>
-              </select>
-            </div>
-            <div className="st-row">
-              <div className="st-row-text">
-                <strong>排练模式</strong>
-                <span>不发送真实按键，只按时间轴走一遍，适合进游戏前校对节奏</span>
-              </div>
+        <div className="settings-check">
+          <div className="settings-check__head">
+            <h3 className="settings-check__title">自检结果</h3>
+            <div className="inline-actions">
               <button
                 type="button"
-                className={`button small ${settings.input.backend === 'dry-run' ? 'primary' : 'ghost'}`}
-                onClick={() =>
-                  patchInput(
-                    { backend: settings.input.backend === 'dry-run' ? 'software' : 'dry-run' },
-                    settings.input.backend === 'dry-run' ? '已切回游戏注入模式' : '已切换到排练模式（不发送按键）',
-                  )
-                }
+                className="btn btn--quiet btn--sm"
+                title={canInject ? '在应用窗口内实际发送一次按键，验证 SendInput 注入链路' : '当前平台不支持按键注入，无法自检'}
+                disabled={!canInject}
+                onClick={() => setSelfTestOpen(true)}
               >
-                <Icon name="play" size={14} /> {settings.input.backend === 'dry-run' ? '退出排练' : '进入排练'}
+                <Icon name="activity" size={13} /> 注入测试
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => void handleRefreshCheck()}
+                disabled={refreshingCheck}
+              >
+                <Icon name="refresh" size={13} /> {refreshingCheck ? '检查中…' : '重新检查'}
               </button>
             </div>
           </div>
-        </section>
-      </div>
+
+          <div className={`settings-check__conclusion is-${checkConclusion.tone}`} aria-live="polite">
+            <span className="settings-check__conclusion-icon" aria-hidden="true">
+              <Icon name={checkIcon(checkConclusion.tone)} size={15} />
+            </span>
+            <div className="settings-check__conclusion-text">
+              <strong>{checkConclusion.title}</strong>
+              {checkConclusion.hint ? <span className="settings-check__hint">{checkConclusion.hint}</span> : null}
+            </div>
+            {showElevationBadge ? <span className="badge badge--warn">待提权</span> : null}
+          </div>
+
+          {checkFacts.length > 0 ? (
+            <div className="settings-facts">
+              {checkFacts.map((fact) => (
+                <div key={fact.label} className={`settings-fact is-${fact.tone}`}>
+                  <Icon name={checkIcon(fact.tone)} size={13} />
+                  <span className="settings-fact__label">{fact.label}</span>
+                  <span className="settings-fact__value" title={fact.value}>
+                    {fact.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {checkWarnings.length > 0 ? (
+            <ul className="settings-notes">
+              {checkWarnings.map((warning, index) => (
+                <li key={`${warning}-${index}`} className="settings-note is-warn">
+                  <Icon name="warning" size={13} />
+                  <span>{warning}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {inputCheck?.helperPath ? <p className="settings-check__path">桥接组件：{inputCheck.helperPath}</p> : null}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard title="演奏安全">
+        <div className="settings-rows">
+          <ToggleRow
+            id="settings-focus-guard"
+            label="焦点保护"
+            description="目标窗口失去焦点时立即停止并释放所有按键"
+            checked={settings.input.focusGuard}
+            onChange={(checked) => patchInput({ focusGuard: checked }, checked ? '焦点保护已开启' : '焦点保护已关闭')}
+          />
+          <ToggleRow
+            id="settings-auto-focus"
+            label="自动聚焦目标窗口"
+            description="开始演奏前把目标窗口切到前台，避免按键发到错误窗口"
+            checked={settings.input.autoFocusTarget}
+            onChange={(checked) => patchInput({ autoFocusTarget: checked }, checked ? '自动聚焦已开启' : '自动聚焦已关闭')}
+          />
+          <ToggleRow
+            id="settings-modifier-combos"
+            label="允许「八度 + 半音」组合"
+            description="开启后可吹出全部半音；实机半音异常时关闭，按兼容模式排键"
+            checked={settings.input.allowModifierCombos}
+            onChange={(checked) =>
+              patchInput(
+                { allowModifierCombos: checked },
+                checked ? '已允许八度 + 半音组合' : '已关闭组合键，使用兼容模式排键',
+              )
+            }
+          />
+          <SettingRow
+            label="开始前倒计时"
+            description="给切回游戏窗口留出准备时间；「不等待」会立即开始"
+            htmlFor="settings-countdown"
+          >
+            <select
+              id="settings-countdown"
+              className="select"
+              value={settings.input.countdownSeconds}
+              aria-describedby="settings-countdown-desc"
+              onChange={(event) => {
+                const seconds = Number(event.target.value);
+                patchInput(
+                  { countdownSeconds: seconds },
+                  seconds === 0 ? '已关闭开始前倒计时' : `开始前倒计时已设为 ${seconds} 秒`,
+                );
+              }}
+            >
+              <option value={0}>不等待</option>
+              <option value={1}>1 秒</option>
+              <option value={3}>3 秒</option>
+              <option value={5}>5 秒</option>
+            </select>
+          </SettingRow>
+        </div>
+      </SettingsCard>
     </div>
   );
 
   /* ============================================================
      Tab 2：演奏时序
      ============================================================ */
-  const timing = settings.input.timing;
   const timingTab = (
-    <div className="st-panel">
-      <div className="st-grid st-grid-asym">
-        <section className="st-card">
-          <CardHead
-            icon="clock"
-            title="演奏时序（毫秒级）"
-            subtitle="控制鼠标修饰键与音符键的按压节奏，直接影响游戏是否丢音"
-            actions={
-              <button type="button" className="button ghost small" onClick={resetTiming}>
-                <Icon name="refresh" size={14} /> 恢复默认
-              </button>
-            }
-          />
-          <div className="st-flow">
-            <span className="st-flow-chip">修饰键按下</span>
-            <span className="st-flow-arrow">→</span>
-            <span className="st-flow-chip">
-              稳定 <em>{timing.modifierSettleMs}ms</em>
-            </span>
-            <span className="st-flow-arrow">→</span>
-            <span className="st-flow-chip">音符键按下</span>
-            <span className="st-flow-arrow">→</span>
-            <span className="st-flow-chip">
-              保持 ≥ <em>{timing.minNoteHoldMs}ms</em>
-            </span>
-            <span className="st-flow-arrow">→</span>
-            <span className="st-flow-chip">
-              释放后间隔 <em>{timing.transitionGapMs}ms</em>
-            </span>
-            <span className="st-flow-arrow">→</span>
-            <span className="st-flow-chip">下一音</span>
-            <span className="st-flow-arrow">·</span>
-            <span className="st-flow-chip">
-              开头留白 <em>{timing.leadInMs}ms</em>
-            </span>
-          </div>
-          <div className="st-timing-grid">
-            {TIMING_FIELDS.map((field) => (
-              <NumberField
-                key={field.key}
-                label={field.label}
-                value={timing[field.key]}
-                min={field.min}
-                max={field.max}
-                step={field.step}
-                defaultValue={DEFAULT_TIMING[field.key]}
-                hint={field.hint}
-                onCommit={(value) => {
-                  const patch: Partial<TimingSettings> = {};
-                  patch[field.key] = value;
-                  patchTiming(patch, `${field.label}已设为 ${value}ms`);
-                }}
-              />
-            ))}
-          </div>
-          <p className="hint-text">
-            默认值来自社区实测：修饰键先稳定 {DEFAULT_TIMING.modifierSettleMs}ms 再按音符键，相邻音留 {DEFAULT_TIMING.transitionGapMs}ms
-            释放窗口，单音最短保持 {DEFAULT_TIMING.minNoteHoldMs}ms。修改会立即保存到设置并用于下一次演奏。
-          </p>
-        </section>
+    <div className="settings-columns settings-columns--split">
+      <SettingsCard
+        title="演奏时序"
+        actions={
+          <button type="button" className="btn btn--quiet btn--sm" onClick={resetTiming}>
+            <Icon name="reset" size={13} /> 恢复默认
+          </button>
+        }
+      >
+        <div className="chip-row">
+          <span className="chip">
+            <span className="chip-label">开头留白</span>
+            <span className="chip-value">{timing.leadInMs} ms</span>
+          </span>
+          <span className="settings-flow__arrow" aria-hidden="true">
+            →
+          </span>
+          <span className="chip">
+            <span className="chip-label">修饰键稳定</span>
+            <span className="chip-value">{timing.modifierSettleMs} ms</span>
+          </span>
+          <span className="settings-flow__arrow" aria-hidden="true">
+            →
+          </span>
+          <span className="chip">
+            <span className="chip-label">音符键保持</span>
+            <span className="chip-value">≥ {timing.minNoteHoldMs} ms</span>
+          </span>
+          <span className="settings-flow__arrow" aria-hidden="true">
+            →
+          </span>
+          <span className="chip">
+            <span className="chip-label">释放间隔</span>
+            <span className="chip-value">{timing.transitionGapMs} ms</span>
+          </span>
+          <span className="settings-flow__arrow" aria-hidden="true">
+            →
+          </span>
+          <span className="chip">
+            <span className="chip-label">修饰键切换</span>
+            <span className="chip-value">{timing.modifierReleaseGapMs} ms</span>
+          </span>
+        </div>
 
-        <section className="st-card">
-          <CardHead icon="sparkle" title="调参建议" subtitle="从默认值小幅调整，每次只改一项再试" />
-          <ul className="st-tips">
-            <li>
-              <strong>经常漏掉修饰音</strong>：把「修饰键稳定时间」从 24ms 调到 30–40ms。
-            </li>
-            <li>
+        <div className="settings-rows">
+          {TIMING_FIELDS.map((field) => (
+            <NumberField
+              key={field.key}
+              id={`settings-timing-${field.key}`}
+              label={field.label}
+              description={field.hint}
+              value={timing[field.key]}
+              min={field.min}
+              max={field.max}
+              step={field.step}
+              onCommit={(value) => {
+                const patch: Partial<TimingSettings> = {};
+                patch[field.key] = value;
+                patchTiming(patch, `${field.label}已设为 ${value} ms`);
+              }}
+            />
+          ))}
+        </div>
+
+        <p className="settings-hint">
+          默认值：{DEFAULT_TIMING.modifierSettleMs} / {DEFAULT_TIMING.transitionGapMs} /{' '}
+          {DEFAULT_TIMING.minNoteHoldMs} / {DEFAULT_TIMING.modifierReleaseGapMs} / {DEFAULT_TIMING.leadInMs} ms
+          （依次为稳定 / 间隔 / 保持 / 切换 / 留白）
+        </p>
+      </SettingsCard>
+
+      <SettingsCard title="调参建议">
+        <ul className="fact-list">
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>
+              <strong>经常漏掉修饰音</strong>：把「修饰键稳定时间」调到 30–40 ms。
+            </span>
+          </li>
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>
               <strong>连音粘连 / 吞音</strong>：适当调大「相邻音释放间隔」，或稍微降低演奏速度。
-            </li>
-            <li>
+            </span>
+          </li>
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>
               <strong>快速音符听不清</strong>：调大「最短音符保持」，但过快的段落会被压缩。
-            </li>
-            <li>
+            </span>
+          </li>
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>
               <strong>八度 / 半音切换不跟手</strong>：调小「修饰键切换间隔」（过低可能丢修饰）。
-            </li>
-            <li>
-              <strong>第一个音被吞</strong>：调大「开头留白」，或在上一个 Tab 开启倒计时。
-            </li>
-            <li>修改后先到演奏台用排练模式（不发送按键）确认节奏，再进游戏。</li>
-          </ul>
-          <p className="hint-text">
-            默认时序：{DEFAULT_TIMING.modifierSettleMs} / {DEFAULT_TIMING.transitionGapMs} / {DEFAULT_TIMING.minNoteHoldMs} /{' '}
-            {DEFAULT_TIMING.modifierReleaseGapMs} / {DEFAULT_TIMING.leadInMs} ms
-          </p>
-        </section>
-      </div>
+            </span>
+          </li>
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>
+              <strong>第一个音被吞</strong>：调大「开头留白」，或在「输入与权限」里开启倒计时。
+            </span>
+          </li>
+          <li>
+            <Icon name="bulb" size={13} />
+            <span>修改后先到演奏台用排练模式（不发送按键）确认节奏，再进游戏。</span>
+          </li>
+        </ul>
+      </SettingsCard>
     </div>
   );
 
@@ -798,183 +946,154 @@ export function SettingsPage(): JSX.Element {
      Tab 3：快捷键
      ============================================================ */
   const hotkeysTab = (
-    <div className="st-panel">
-      <div className="st-grid">
-        <section className="st-card st-span-2">
-          <CardHead
-            icon="settings"
-            title="全局快捷键"
-            subtitle="点击快捷键框后按下新组合；单独按修饰键不会结束，Esc 取消。快捷键由系统全局注册，游戏全屏时同样生效"
-            actions={
-              <>
-                {hotkeyStatusError ? (
-                  <span className="st-badge warn">状态未知</span>
-                ) : hotkeyStatuses ? (
-                  failedCount > 0 ? (
-                    <span className="st-badge danger">
-                      <Icon name="warning" size={11} /> {failedCount} 项注册失败
-                    </span>
-                  ) : (
-                    <span className="st-badge ok">
-                      <Icon name="check" size={11} /> {registeredCount}/{HOTKEY_ACTIONS.length} 已生效
-                    </span>
-                  )
-                ) : (
-                  <span className="st-badge">检测中…</span>
-                )}
-                <button type="button" className="button ghost small" onClick={() => void refreshHotkeyStatuses()} disabled={hotkeyStatusLoading}>
-                  <Icon name="refresh" size={14} /> 刷新状态
-                </button>
-                <button type="button" className="button ghost small" onClick={resetHotkeys}>
-                  <Icon name="refresh" size={14} /> 恢复默认
-                </button>
-              </>
-            }
-          />
-
-          {recordingLabel ? (
-            <div className="st-recording-banner">
-              <Icon name="sparkle" size={15} /> 正在录制「{recordingLabel}」：请按下组合键，按 Esc 取消
+    <SettingsCard
+      title="全局快捷键"
+      actions={
+        <>
+          {hotkeySummaryBadge}
+          <button
+            type="button"
+            className="btn btn--quiet btn--sm"
+            onClick={() => void refreshHotkeyStatuses()}
+            disabled={hotkeyStatusLoading}
+          >
+            <Icon name="refresh" size={13} /> 刷新状态
+          </button>
+          <button type="button" className="btn btn--quiet btn--sm" onClick={resetHotkeys}>
+            <Icon name="reset" size={13} /> 恢复默认
+          </button>
+        </>
+      }
+    >
+      <div className="settings-hotkeys">
+        {HOTKEY_ACTIONS.map((action) => {
+          const meta = HOTKEY_META[action];
+          const conflict = hotkeyConflicts[action] ?? null;
+          const isOtherRecording = recordingAction !== null && recordingAction !== action;
+          return (
+            <div key={action} className="settings-hotkey">
+              <div className="settings-hotkey__text">
+                <span className="settings-hotkey__label">{meta.label}</span>
+                <p className="settings-hotkey__desc">{meta.description}</p>
+                <span className="settings-hotkey__default">默认 {formatAccelerator(meta.defaultAccelerator)}</span>
+              </div>
+              <HotkeyRecorder
+                value={settings.hotkeys[action]}
+                conflict={conflict}
+                disabled={isOtherRecording}
+                onChange={(accelerator) => handleRecordChange(action, accelerator)}
+                onRecordingChange={(recording) => handleRecordingChange(action, recording)}
+              />
+              <div className="settings-hotkey__status">
+                {conflict ? <span className="badge badge--warn">冲突</span> : null}
+                {renderHotkeyStatus(action)}
+              </div>
             </div>
-          ) : null}
-
-          <div className="st-hotkey-list">
-            {HOTKEY_ACTIONS.map((action) => {
-              const meta = HOTKEY_META[action];
-              const isOtherRecording = recordingAction !== null && recordingAction !== action;
-              return (
-                <div key={action} className="st-hotkey-row">
-                  <div className="st-hotkey-meta">
-                    <span className="st-hotkey-icon">
-                      <Icon name={meta.icon} size={15} />
-                    </span>
-                    <div className="st-hotkey-info">
-                      <strong>{meta.label}</strong>
-                      <span>{meta.description}</span>
-                      <em className="st-hotkey-default">默认 {formatAccelerator(meta.defaultAccelerator)}</em>
-                    </div>
-                  </div>
-                  <HotkeyRecorder
-                    value={settings.hotkeys[action]}
-                    conflict={hotkeyConflicts[action] ?? null}
-                    disabled={isOtherRecording}
-                    onChange={(accelerator) => handleRecordChange(action, accelerator)}
-                    onRecordingChange={(recording) => handleRecordingChange(action, recording)}
-                  />
-                  <div className="st-hotkey-status">{renderHotkeyStatus(action)}</div>
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="hint-text">
-            「已生效」表示主进程已成功注册该组合；「注册失败」通常是被系统 / 其他软件（如显卡驱动、聊天工具、录屏软件）占用，
-            或与其他动作冲突。录制期间旧快捷键仍可能在系统层触发，这是 Electron 全局热键的限制。
-            建议给「紧急停止」保留一个易按且独立的按键。
-          </p>
-        </section>
+          );
+        })}
       </div>
-    </div>
+
+      <hr className="divider" />
+
+      <p className="settings-hint">
+        「已生效」表示主进程已注册成功；「注册失败」多是被系统或其他软件占用，换一个组合后再刷新状态。
+        建议给「紧急停止」保留独立、易按的按键。
+      </p>
+    </SettingsCard>
   );
 
   /* ============================================================
      Tab 4：悬浮窗与外观
      ============================================================ */
   const overlayTab = (
-    <div className="st-panel">
-      <div className="st-grid">
-        <section className="st-card">
-          <CardHead
-            icon="overlay"
-            title="悬浮控制窗"
-            subtitle="常驻游戏画面之上的小控制面板，不抢游戏焦点，可拖动位置"
-            actions={<span className={`st-badge ${overlayVisible ? 'ok' : ''}`}>{overlayVisible ? '已显示' : '已隐藏'}</span>}
-          />
-          <div className="st-overlay-hero">
-            <span className={`st-overlay-state ${overlayVisible ? 'on' : ''}`}>
-              <span className="st-overlay-dot" />
-              {overlayVisible ? '悬浮窗正在显示' : '悬浮窗当前隐藏'}
-            </span>
-            <button type="button" className={`button small ${overlayVisible ? 'danger' : 'primary'}`} onClick={() => void handleToggleOverlay()}>
-              <Icon name={overlayVisible ? 'close' : 'overlay'} size={15} /> {overlayVisible ? '隐藏悬浮窗' : '显示悬浮窗'}
+    <div className="settings-columns">
+      <SettingsCard title="悬浮控制窗">
+        <div className="settings-rows">
+          <SettingRow label="悬浮窗显示" description="显示后可用鼠标拖动到合适位置；隐藏不影响全局快捷键">
+            <button type="button" className="btn btn--sm" onClick={() => void handleToggleOverlay()}>
+              <Icon name="overlay" size={13} />
+              {overlayVisible ? '隐藏悬浮窗' : '显示悬浮窗'}
             </button>
-          </div>
+          </SettingRow>
 
           <RangeField
+            id="settings-overlay-opacity"
             label="不透明度"
+            description="0.3 最淡，1 完全不透明"
             value={settings.overlay.opacity}
             min={0.3}
             max={1}
             step={0.01}
             format={(value) => `${Math.round(value * 100)}%`}
-            hint="悬浮窗整体透明度：0.3 最淡，1 完全不透明。"
-            onCommit={(value) => patchOverlay({ opacity: value }, `悬浮窗不透明度已保存：${Math.round(value * 100)}%`)}
+            onCommit={(value) =>
+              patchOverlay({ opacity: value }, `悬浮窗不透明度已保存：${Math.round(value * 100)}%`)
+            }
           />
 
-          <div className="st-rows">
-            <ToggleRow
-              title="保持置顶"
-              description="始终显示在游戏画面之上；关闭后可能被游戏窗口遮挡"
-              checked={settings.overlay.alwaysOnTop}
-              onChange={(checked) => patchOverlay({ alwaysOnTop: checked }, checked ? '悬浮窗保持置顶已开启' : '悬浮窗保持置顶已关闭')}
-            />
-            <ToggleRow
-              title="显示快捷键提示"
-              description="在悬浮窗底部显示当前全局快捷键，方便游戏内查看"
-              checked={settings.overlay.showHotkeyHint}
-              onChange={(checked) => patchOverlay({ showHotkeyHint: checked }, checked ? '悬浮窗快捷键提示已开启' : '悬浮窗快捷键提示已关闭')}
-            />
-            <div className="st-row">
-              <div className="st-row-text">
-                <strong>重置位置</strong>
-                <span>把悬浮窗移回屏幕右下角默认位置；当前版本需重启应用后生效</span>
-              </div>
-              <button type="button" className="button ghost small" onClick={handleResetOverlayPosition}>
-                <Icon name="target" size={14} /> 重置位置
-              </button>
+          <ToggleRow
+            id="settings-overlay-top"
+            label="保持置顶"
+            description="始终显示在游戏画面之上；关闭后可能被游戏窗口遮挡"
+            checked={settings.overlay.alwaysOnTop}
+            onChange={(checked) =>
+              patchOverlay({ alwaysOnTop: checked }, checked ? '悬浮窗保持置顶已开启' : '悬浮窗保持置顶已关闭')
+            }
+          />
+          <ToggleRow
+            id="settings-overlay-hint"
+            label="显示快捷键提示"
+            description="在悬浮窗底部显示当前全局快捷键，方便游戏内查看"
+            checked={settings.overlay.showHotkeyHint}
+            onChange={(checked) =>
+              patchOverlay(
+                { showHotkeyHint: checked },
+                checked ? '悬浮窗快捷键提示已开启' : '悬浮窗快捷键提示已关闭',
+              )
+            }
+          />
+
+          <SettingRow label="重置位置" description="移回屏幕右下角默认位置；重启应用后生效">
+            <button type="button" className="btn btn--quiet btn--sm" onClick={handleResetOverlayPosition}>
+              <Icon name="target" size={13} /> 重置位置
+            </button>
+          </SettingRow>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard title="试听音色">
+        <div className="settings-rows">
+          <SettingRow
+            label="试听音色"
+            description="口琴为 VCSL Hohner Special 20 真实簧片采样；钢琴为 Salamander 三角钢琴采样，便于核对音高与节奏"
+          >
+            <div className="segmented" role="group" aria-label="试听音色">
+              {PREVIEW_INSTRUMENTS.map((instrument) => (
+                <button
+                  key={instrument.id}
+                  type="button"
+                  className="segmented__item"
+                  aria-pressed={settings.preview.instrument === instrument.id}
+                  onClick={() => patchPreview({ instrument: instrument.id }, `试听音色已切换为「${instrument.name}」`)}
+                >
+                  {instrument.name}
+                </button>
+              ))}
             </div>
-          </div>
+          </SettingRow>
 
-          <div className="st-overlay-hints">
-            <span className="hint-text">快捷键提示（开启后显示在悬浮窗上）：</span>
-            {HOTKEY_ACTIONS.map((action) => (
-              <span key={action} className="st-pill">
-                <Icon name={HOTKEY_META[action].icon} size={11} />
-                {formatAccelerator(settings.hotkeys[action])} {HOTKEY_META[action].label}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="st-card">
-          <CardHead icon="headphones" title="试听音色与音量" subtitle="只影响应用内试听，不会改变游戏内实际发声" />
-          <div className="st-segmented two">
-            {PREVIEW_INSTRUMENTS.map((instrument) => (
-              <button
-                key={instrument.id}
-                type="button"
-                className={`st-segment ${settings.preview.instrument === instrument.id ? 'active' : ''}`}
-                aria-pressed={settings.preview.instrument === instrument.id}
-                onClick={() => patchPreview({ instrument: instrument.id }, `试听音色已切换为「${instrument.name}」`)}
-              >
-                <strong>{instrument.name}</strong>
-                <span>{instrument.description}</span>
-              </button>
-            ))}
-          </div>
           <RangeField
+            id="settings-preview-volume"
             label="试听音量"
+            description="底部播放条、演奏台与编辑器共用这一音量"
             value={settings.preview.volume}
             min={0}
             max={1}
             step={0.01}
             format={(value) => `${Math.round(value * 100)}%`}
-            hint="影响底部播放条、演奏台与编辑器中的试听音量。"
             onCommit={(value) => patchPreview({ volume: value }, `试听音量已保存：${Math.round(value * 100)}%`)}
           />
-          <p className="hint-text">音色与音量保存在设置中，所有页面共用同一套试听配置；修改后可在底部播放条立即试听。</p>
-        </section>
-      </div>
+        </div>
+      </SettingsCard>
     </div>
   );
 
@@ -982,115 +1101,154 @@ export function SettingsPage(): JSX.Element {
      Tab 5：音频分析
      ============================================================ */
   const audioTab = (
-    <div className="st-panel">
-      <div className="st-grid st-grid-asym">
-        <section className="st-card">
-          <CardHead
-            icon="music"
-            title="主旋律提取"
-            subtitle="音频转谱时如何从混音中找出主旋律"
-            actions={
-              <button type="button" className="button ghost small" onClick={resetAudio}>
-                <Icon name="refresh" size={14} /> 恢复默认
-              </button>
-            }
-          />
-          <div className="st-field">
-            <span className="field-label">提取模式</span>
-            <div className="st-segmented">
+    <div className="settings-columns">
+      <SettingsCard
+        title="主旋律提取"
+        actions={
+          <button type="button" className="btn btn--quiet btn--sm" onClick={resetAudio}>
+            <Icon name="reset" size={13} /> 恢复默认
+          </button>
+        }
+      >
+        <div className="settings-rows">
+          <SettingRow
+            label="提取模式"
+            description="自动判断复音程度；清唱 / 独奏选单声部，带伴奏歌曲选复音"
+          >
+            <div className="segmented" role="group" aria-label="提取模式">
               {MELODY_MODE_OPTIONS.map((option) => (
                 <button
                   key={option.id}
                   type="button"
-                  className={`st-segment ${settings.audio.melodyMode === option.id ? 'active' : ''}`}
+                  className="segmented__item"
                   aria-pressed={settings.audio.melodyMode === option.id}
                   onClick={() => patchAudio({ melodyMode: option.id }, `分析模式已切换为「${option.name}」`)}
                 >
-                  <strong>{option.name}</strong>
-                  <span>{option.description}</span>
+                  {option.name}
                 </button>
               ))}
             </div>
-          </div>
+          </SettingRow>
 
-          <div className="st-pitch">
-            <div className="st-pitch-head">
-              <span className="st-pitch-title">主旋律音域</span>
-              <span className="st-pitch-value">
-                {midiToName(settings.audio.pitchMin)} – {midiToName(settings.audio.pitchMax)}
-                <em>
-                  MIDI {settings.audio.pitchMin} – {settings.audio.pitchMax}
-                </em>
-              </span>
-            </div>
-            <RangeField
-              label="音域下限"
-              value={settings.audio.pitchMin}
-              min={PITCH_MIN}
-              max={settings.audio.pitchMax}
-              step={1}
-              format={(value) => `${midiToName(value)}（${value}）`}
-              onCommit={(value) => patchAudio({ pitchMin: value }, `主旋律音域下限已设为 ${midiToName(value)}`)}
-            />
-            <RangeField
-              label="音域上限"
-              value={settings.audio.pitchMax}
-              min={settings.audio.pitchMin}
-              max={PITCH_MAX}
-              step={1}
-              format={(value) => `${midiToName(value)}（${value}）`}
-              onCommit={(value) => patchAudio({ pitchMax: value }, `主旋律音域上限已设为 ${midiToName(value)}`)}
-            />
-            <div className="st-pitch-presets">
+          <RangeField
+            id="settings-pitch-min"
+            label="音域下限"
+            description="低于下限的旋律会被丢弃或折返"
+            value={settings.audio.pitchMin}
+            min={PITCH_MIN}
+            max={settings.audio.pitchMax}
+            step={1}
+            format={(value) => `${midiToName(value)}（${value}）`}
+            onCommit={(value) => patchAudio({ pitchMin: value }, `主旋律音域下限已设为 ${midiToName(value)}`)}
+          />
+          <RangeField
+            id="settings-pitch-max"
+            label="音域上限"
+            description="高于上限的旋律会被丢弃或折返"
+            value={settings.audio.pitchMax}
+            min={settings.audio.pitchMin}
+            max={PITCH_MAX}
+            step={1}
+            format={(value) => `${midiToName(value)}（${value}）`}
+            onCommit={(value) => patchAudio({ pitchMax: value }, `主旋律音域上限已设为 ${midiToName(value)}`)}
+          />
+
+          <SettingRow
+            label="常用音域"
+            description={`默认 ${midiToName(PITCH_PRESETS[0].min)} – ${midiToName(PITCH_PRESETS[0].max)}；一键套用后仍可单独微调上下限`}
+          >
+            <div className="segmented" role="group" aria-label="常用音域">
               {PITCH_PRESETS.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
-                  className={`st-preset ${settings.audio.pitchMin === preset.min && settings.audio.pitchMax === preset.max ? 'active' : ''}`}
-                  onClick={() => patchAudio({ pitchMin: preset.min, pitchMax: preset.max }, `主旋律音域已设为 ${midiToName(preset.min)} – ${midiToName(preset.max)}`)}
+                  className="segmented__item"
+                  aria-pressed={settings.audio.pitchMin === preset.min && settings.audio.pitchMax === preset.max}
+                  onClick={() =>
+                    patchAudio(
+                      { pitchMin: preset.min, pitchMax: preset.max },
+                      `主旋律音域已设为 ${midiToName(preset.min)} – ${midiToName(preset.max)}`,
+                    )
+                  }
                 >
                   {preset.label}
                 </button>
               ))}
             </div>
-          </div>
+          </SettingRow>
 
-          <div className="st-rows">
-            <ToggleRow
-              title="伴奏抑制（HPSS）"
-              description="用谐波 / 打击分离削弱鼓点与伴奏，带伴奏歌曲强烈建议开启"
-              checked={settings.audio.suppressAccompaniment}
-              onChange={(checked) => patchAudio({ suppressAccompaniment: checked }, checked ? '伴奏抑制已开启' : '伴奏抑制已关闭')}
-            />
-            <ToggleRow
-              title="自动检测调性"
-              description="转谱时自动判断大调 / 小调，写入简谱调号"
-              checked={settings.audio.autoKey}
-              onChange={(checked) => patchAudio({ autoKey: checked }, checked ? '自动检测调性已开启' : '自动检测调性已关闭')}
-            />
-          </div>
-        </section>
+          <ToggleRow
+            id="settings-audio-hpss"
+            label="伴奏抑制（HPSS）"
+            description="用谐波 / 打击分离削弱鼓点与伴奏；带伴奏歌曲建议开启"
+            checked={settings.audio.suppressAccompaniment}
+            onChange={(checked) =>
+              patchAudio(
+                { suppressAccompaniment: checked },
+                checked ? '伴奏抑制已开启' : '伴奏抑制已关闭',
+              )
+            }
+          />
+          <ToggleRow
+            id="settings-audio-autokey"
+            label="自动检测调性"
+            description="转谱时自动判断大调 / 小调并写入简谱调号"
+            checked={settings.audio.autoKey}
+            onChange={(checked) =>
+              patchAudio({ autoKey: checked }, checked ? '自动检测调性已开启' : '自动检测调性已关闭')
+            }
+          />
+        </div>
+      </SettingsCard>
 
-        <section className="st-card">
-          <CardHead icon="target" title="扒谱细节" subtitle="影响转谱后的节奏密度与可演奏性" />
+      <SettingsCard title="扒谱细节">
+        <div className="settings-rows">
           <NumberField
+            id="settings-audio-min-note"
             label="最短音符"
+            description="短于该时长的音会被过滤：调大可去掉颤音碎片，过大会丢快速音符"
             value={settings.audio.minNoteMs}
             min={30}
             max={300}
             step={5}
-            defaultValue={DEFAULT_SETTINGS.audio.minNoteMs}
-            hint="短于该时长的音会被过滤：调大可去除颤音碎片，过大会丢快速音符。"
-            onCommit={(value) => patchAudio({ minNoteMs: value }, `最短音符已设为 ${value}ms`)}
+            onCommit={(value) => patchAudio({ minNoteMs: value }, `最短音符已设为 ${value} ms`)}
           />
-          <div className="st-row">
-            <div className="st-row-text">
-              <strong>量化网格</strong>
-              <span>音符起点对齐到节拍网格：1/16 更精细，1/8 更简单。</span>
+
+          <SettingRow
+            label="谱面密度（音频）"
+            description="音频转谱的“可演奏化”程度：宽松每拍最多 1 音；标准合并同音碎片、每拍最多 2 音；精细保留 1/16 细节"
+          >
+            <div className="segmented" role="group" aria-label="谱面密度">
+              {([
+                { id: 'loose', name: '宽松' },
+                { id: 'normal', name: '标准' },
+                { id: 'fine', name: '精细' },
+              ] as const).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="segmented__item"
+                  aria-pressed={settings.audio.melodyDensity === option.id}
+                  onClick={() =>
+                    patchAudio({ melodyDensity: option.id }, `谱面密度已设为「${option.name}」`)
+                  }
+                >
+                  {option.name}
+                </button>
+              ))}
             </div>
+          </SettingRow>
+
+          <SettingRow
+            label="MIDI 量化网格"
+            description="MIDI 导入时音符起点对齐到节拍网格：1/16 更精细，1/8 更简单；音频转谱由「谱面密度」控制"
+            htmlFor="settings-quantize"
+          >
             <select
-              className="select st-select"
+              id="settings-quantize"
+              className="select"
               value={settings.audio.quantizeGrid}
+              aria-describedby="settings-quantize-desc"
               onChange={(event) => {
                 const grid = Number(event.target.value);
                 patchAudio({ quantizeGrid: grid }, `量化网格已设为 ${QUANTIZE_LABEL[grid] ?? grid}`);
@@ -1100,29 +1258,16 @@ export function SettingsPage(): JSX.Element {
               <option value={0.25}>1/16（推荐）</option>
               <option value={0.5}>1/8（简化）</option>
             </select>
-          </div>
+          </SettingRow>
+        </div>
 
-          <div className="st-banner warn">
-            <Icon name="warning" size={17} />
-            <div className="st-banner-text">
-              <strong>带伴奏歌曲请用 auto / polyphonic + 开启伴奏抑制</strong>
-              <p>否则很容易把低音、和弦当成主旋律，转谱结果会变得又乱又难演奏。</p>
-            </div>
-          </div>
+        <hr className="divider" />
 
-          <ul className="st-tips">
-            <li>
-              <strong>清唱 / 独奏</strong>：选「单声部」通常更稳，音域按人声范围调整。
-            </li>
-            <li>
-              <strong>音域越窄越干净</strong>，但超出范围的旋律会被丢弃或折返。
-            </li>
-            <li>
-              <strong>最短音符与量化</strong>决定谱面可玩性：太难演奏的段落可放宽这两个参数。
-            </li>
-          </ul>
-        </section>
-      </div>
+        <p className="settings-note is-warn">
+          <Icon name="warning" size={13} />
+          <span>带伴奏歌曲请用「自动判断 / 复音」并开启伴奏抑制，否则低音与和弦会被当成主旋律。</span>
+        </p>
+      </SettingsCard>
     </div>
   );
 
@@ -1130,99 +1275,86 @@ export function SettingsPage(): JSX.Element {
      Tab 6：风险与关于
      ============================================================ */
   const aboutTab = (
-    <div className="st-panel">
-      <div className="st-grid">
-        <section className="st-card st-span-2">
-          <CardHead icon="warning" title="风险声明与合规提示" subtitle="使用前请确认你了解以下风险" />
-          <div className="st-banner danger">
-            <Icon name="warning" size={20} />
-            <div className="st-banner-text">
-              <strong>游戏官方已公开将「第三方软件 / 脚本 / 鼠标宏自动操作」列为违规行为，最高封禁 10 年。</strong>
-              <p>
-                本软件是非官方工具，与腾讯 / 天美工作室群无关，仅供个人练习与录制娱乐使用。软件只调用 Windows 标准 SendInput
-                模拟键鼠输入，<em>不注入游戏进程、不读写游戏内存、不安装驱动、不做任何反检测</em>。
-              </p>
-              <p>使用本工具存在账号被处罚的风险，且风险由使用者自行承担；建议不要在排位 / 竞技对局中长时间使用。</p>
-            </div>
-          </div>
-          <div className="st-link-list">
-            <span className="section-label">官方公告与处罚说明</span>
+    <div className="settings-columns">
+      <SettingsCard title="风险声明">
+        <p className="settings-callout">
+          <Icon name="warning" size={15} />
+          <span>
+            <strong>游戏官方已把「第三方软件 / 脚本 / 鼠标宏自动操作」列为违规，最高封禁 10 年。</strong>
+            本软件是非官方工具，与腾讯 / 天美工作室群无关。
+          </span>
+        </p>
+        <ul className="fact-list">
+          <li>
+            <Icon name="shield" size={13} />
+            <span>只调用 Windows 标准 SendInput 模拟键鼠，不注入游戏进程、不读写游戏内存、不安装驱动、不做任何反检测。</span>
+          </li>
+          <li>
+            <Icon name="warning" size={13} />
+            <span>账号处罚风险由使用者自行承担，建议不要在排位 / 竞技对局中长时间使用。</span>
+          </li>
+          <li>
+            <Icon name="users" size={13} />
+            <span>仅供个人练习与录制娱乐；继续使用即表示你已阅读并接受首次启动时的免责声明。</span>
+          </li>
+        </ul>
+
+        <hr className="divider" />
+
+        <div className="settings-links">
+          <span className="section-label">官方公告与处罚说明</span>
+          <ul>
             {OFFICIAL_LINKS.map((link) => (
-              <button key={link.url} type="button" className="st-link-item" onClick={() => openExternal(link.url)}>
-                <Icon name="chevron" size={12} /> {link.label}
-              </button>
+              <li key={link.url}>
+                <button type="button" className="link-button" onClick={() => openExternal(link.url)}>
+                  <Icon name="external" size={12} /> {link.label}
+                </button>
+              </li>
             ))}
-          </div>
-        </section>
+          </ul>
+        </div>
+      </SettingsCard>
 
-        <section className="st-card">
-          <CardHead
-            icon="folder"
-            title="版本与数据"
-            subtitle="应用运行信息与本机数据目录"
-            actions={
-              <button type="button" className="button ghost small" onClick={openUserData}>
-                <Icon name="folder" size={14} /> 打开数据目录
-              </button>
-            }
+      <SettingsCard title="版本与本机数据">
+        <div className="chip-row">
+          <Chip label="版本" value={`v${appInfo?.version ?? '0.0.0'}`} />
+          <Chip label="Electron" value={appInfo?.electronVersion ?? '—'} />
+          <Chip label="Chromium" value={appInfo?.chromeVersion ?? '—'} />
+          <Chip label="Node" value={appInfo?.nodeVersion ?? '—'} />
+          <Chip
+            label="平台"
+            value={`${appInfo?.capabilities.label ?? appInfo?.platform ?? '—'}${appInfo?.arch ? ` · ${appInfo.arch}` : ''}`}
           />
-          <div className="st-info-grid">
-            <div className="st-info-chip">
-              <span>版本</span>
-              <span>v{appInfo?.version ?? '0.1.0'}</span>
-            </div>
-            <div className="st-info-chip">
-              <span>Electron</span>
-              <span>{appInfo?.electronVersion ?? '-'}</span>
-            </div>
-            <div className="st-info-chip">
-              <span>Chromium</span>
-              <span>{appInfo?.chromeVersion ?? '-'}</span>
-            </div>
-            <div className="st-info-chip">
-              <span>Node</span>
-              <span>{appInfo?.nodeVersion ?? '-'}</span>
-            </div>
-            <div className="st-info-chip">
-              <span>平台</span>
-              <span>{appInfo?.platform ?? '-'}</span>
-            </div>
-            <div className="st-info-chip">
-              <span>运行模式</span>
-              <span>{appInfo?.isPackaged ? '安装版' : '开发版'}</span>
-            </div>
-          </div>
-          <div className="st-path">{appInfo?.userDataPath ?? '加载中…'}</div>
-        </section>
+          <Chip label="运行模式" value={appInfo?.isPackaged ? '安装版' : '开发版'} />
+        </div>
 
-        <section className="st-card">
-          <CardHead icon="music" title="口琴键位表（PC）" subtitle="游戏内「守夜人口琴」演奏界面" />
-          <div className="st-keysheet">
-            <div className="st-keycap-row">
+        <div className="settings-datapath">
+          <span className="field-label">数据目录</span>
+          <code className="settings-path">{appInfo?.userDataPath ?? '加载中…'}</code>
+        </div>
+
+        <hr className="divider" />
+
+        <details className="settings-details">
+          <summary>游戏内口琴键位表</summary>
+          <div className="settings-keysheet">
+            <div className="settings-keysheet__row">
               {DEFAULT_HARMONICA.noteKeys.map((key) => (
-                <div key={key.id} className="st-keycap-cell">
-                  <span className="st-keycap">{key.label}</span>
-                  <span className="st-keycap-degree">{key.degree === 8 ? '高音 1' : String(key.degree)}</span>
+                <div key={key.id} className="settings-key">
+                  <kbd>{key.label}</kbd>
+                  <span className="settings-key__degree">{key.degree === 8 ? '高音 1' : String(key.degree)}</span>
                 </div>
               ))}
             </div>
-            <div className="st-mouse-map">
-              <span>
-                <b>鼠标左键</b> 降八度
-              </span>
-              <span>
-                <b>鼠标中键</b> 升半音
-              </span>
-              <span>
-                <b>鼠标右键</b> 升八度
-              </span>
+            <div className="settings-keysheet__mouse">
+              <span>鼠标左键 · 降八度</span>
+              <span>鼠标中键 · 升半音</span>
+              <span>鼠标右键 · 升八度</span>
             </div>
+            <p className="settings-hint">音域 C3 – C#6（约 3 个八度、38 个半音），单音演奏；游戏改过键位时以实机为准。</p>
           </div>
-          <p className="hint-text">
-            音域 C3 – C#6（约 3 个八度、38 个半音），单音演奏。若游戏版本改过键位，可通过「输入通道自检」确认实际按键。
-          </p>
-        </section>
-      </div>
+        </details>
+      </SettingsCard>
     </div>
   );
 
@@ -1238,43 +1370,73 @@ export function SettingsPage(): JSX.Element {
   };
 
   return (
-    <div className="page st-page">
+    <div className="page">
       <PageHeader
         title="设置与校准"
-        subtitle="输入通道 · 演奏时序 · 全局快捷键 · 悬浮窗 · 音频分析 —— 所有修改立即写入设置并生效"
+        subtitle="修改即时保存"
         actions={
-          <>
-            <span className="st-autosave">
-              <Icon name="check" size={12} /> 所有修改即时保存
-            </span>
-            <button type="button" className="button ghost small" onClick={openUserData}>
-              <Icon name="folder" size={14} /> 打开数据目录
-            </button>
-          </>
+          <button type="button" className="btn btn--sm" onClick={openUserData}>
+            <Icon name="folder" size={14} /> 打开数据目录
+          </button>
         }
       />
 
-      <div className="st-tabs" role="tablist" aria-label="设置分类">
-        {TABS.map((item) => (
+      {!canInject ? (
+        <Notice tone="signal" icon={<Icon name="info" size={15} />} title={`${capabilities?.label ?? '当前平台'} 版：游戏注入不可用`}>
+          编辑、导入、练习、试听与宏导出可正常使用；向游戏发送按键需要 Windows 版。输入与权限中的注入相关选项已置灰，演奏会按排练模式走时间轴。
+        </Notice>
+      ) : elevated ? (
+        <Notice tone="ok" icon={<Icon name="shield" size={15} />} title="已以管理员权限运行">
+          向游戏注入按键不会被 Windows UIPI 拦截；排练模式与试听不依赖权限，随时可用。
+        </Notice>
+      ) : (
+        <Notice
+          tone="warn"
+          icon={<Icon name="warning" size={15} />}
+          title="尚未以管理员权限运行"
+          actions={
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => void handleRelaunch()}
+              disabled={elevating}
+            >
+              <Icon name="shield" size={13} /> {elevating ? '正在请求…' : '以管理员重启'}
+            </button>
+          }
+        >
+          向游戏注入按键会被 Windows 静默丢弃；排练模式与试听不受影响。
+        </Notice>
+      )}
+
+      <div className="tabs settings-tabs" role="tablist" aria-label="设置分类" onKeyDown={handleTabKeyDown}>
+        {TABS.map((item, index) => (
           <button
             key={item.id}
+            ref={(element) => {
+              tabRefs.current[index] = element;
+            }}
+            id={`settings-tab-${item.id}`}
             type="button"
             role="tab"
+            className="tab"
             aria-selected={tab === item.id}
-            className={`st-tab ${tab === item.id ? 'active' : ''}`}
+            tabIndex={tab === item.id ? 0 : -1}
             onClick={() => setTab(item.id)}
           >
-            <Icon name={item.icon} size={15} />
-            <span>{item.label}</span>
-            {item.id === 'hotkeys' && failedCount > 0 ? <span className="st-tab-badge">{failedCount}</span> : null}
-            {item.id === 'input' && appInfo && !appInfo.elevated ? <span className="st-tab-badge warn">!</span> : null}
+            {item.label}
           </button>
         ))}
       </div>
 
-      <div role="tabpanel" aria-label={activeTab.label}>
+      <section
+        className="settings-panel"
+        role="tabpanel"
+        id={`settings-panel-${tab}`}
+        aria-labelledby={`settings-tab-${tab}`}
+      >
         {tabContent[tab]}
-      </div>
+      </section>
     </div>
   );
 }
@@ -1283,62 +1445,101 @@ export function SettingsPage(): JSX.Element {
    页面内复用的小组件
    ============================================================ */
 
-/** 卡片标题区：图标 + 标题 + 说明 + 右侧操作 */
-function CardHead({
-  icon,
+/** 页面卡片：标题 + 一句说明 + 右侧操作；一个 tab 最多两张 */
+function SettingsCard({
   title,
-  subtitle,
   actions,
+  children,
 }: {
-  icon: IconName;
   title: string;
-  subtitle?: string;
   actions?: ReactNode;
+  children: ReactNode;
 }): JSX.Element {
   return (
-    <header className="st-card-head">
-      <span className="st-card-icon">
-        <Icon name={icon} size={17} />
-      </span>
-      <div className="st-card-heading">
-        <h3>{title}</h3>
-        {subtitle ? <p>{subtitle}</p> : null}
+    <section className="card settings-block" aria-label={title}>
+      <div className="card-title-row">
+        <div className="settings-block__heading">
+          <h2 className="card-title">{title}</h2>
+        </div>
+        {actions ? <div className="inline-actions">{actions}</div> : null}
       </div>
-      {actions ? <div className="st-card-actions">{actions}</div> : null}
-    </header>
+      {children}
+    </section>
   );
 }
 
-/** 行式开关：左侧标题 + 说明，右侧开关（复用 global.css 的 .switch） */
+/** 统一设置行：左侧标签 + 说明，右侧控件；不画行分隔线，分组之间用 .divider */
+function SettingRow({
+  label,
+  description,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  description?: string;
+  htmlFor?: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div className="settings-row">
+      <div className="settings-row__text">
+        {htmlFor ? (
+          <label className="settings-row__label" htmlFor={htmlFor}>
+            {label}
+          </label>
+        ) : (
+          <span className="settings-row__label">{label}</span>
+        )}
+        {description ? (
+          <p className="settings-row__desc" id={htmlFor ? `${htmlFor}-desc` : undefined}>
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <div className="settings-row__control">{children}</div>
+    </div>
+  );
+}
+
+/** 行式开关：可见标签在左列，开关本体通过 htmlFor 关联，读屏可读出名称与状态 */
 function ToggleRow({
-  title,
+  id,
+  label,
   description,
   checked,
   disabled = false,
   onChange,
 }: {
-  title: string;
+  id: string;
+  label: string;
   description: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }): JSX.Element {
+  const descriptionId = `${id}-desc`;
   return (
-    <div className="st-row">
-      <div className="st-row-text">
-        <strong>{title}</strong>
-        <span>{description}</span>
+    <div className="settings-row">
+      <div className="settings-row__text">
+        <label className="settings-row__label" htmlFor={id}>
+          {label}
+        </label>
+        <p className="settings-row__desc" id={descriptionId}>
+          {description}
+        </p>
       </div>
-      <label className="switch" title={description}>
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          aria-label={title}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span className="st-switch-state">{checked ? '已开启' : '已关闭'}</span>
-      </label>
+      <div className="settings-row__control">
+        <label className="switch">
+          <input
+            id={id}
+            type="checkbox"
+            checked={checked}
+            disabled={disabled}
+            aria-describedby={descriptionId}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+        </label>
+      </div>
     </div>
   );
 }
@@ -1348,27 +1549,28 @@ function ToggleRow({
  * 避免直接受控导致输入中间值被立即裁剪（例如先输 1 再输 0 变成 4）。
  */
 function NumberField({
+  id,
   label,
+  description,
   value,
   min,
   max,
   step,
   unit = 'ms',
-  hint,
-  defaultValue,
   onCommit,
 }: {
+  id: string;
   label: string;
+  description: string;
   value: number;
   min: number;
   max: number;
   step: number;
   unit?: string;
-  hint?: string;
-  defaultValue?: number;
   onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(String(value));
+  const descriptionId = `${id}-desc`;
 
   useEffect(() => {
     setDraft(String(value));
@@ -1386,18 +1588,26 @@ function NumberField({
   };
 
   return (
-    <label className="st-num-field">
-      <span className="st-num-top">
-        <span className="st-num-label">{label}</span>
-        {defaultValue !== undefined && value === defaultValue ? <em className="st-default-tag">默认</em> : null}
-      </span>
-      <span className="st-num-wrap">
+    <div className="settings-row">
+      <div className="settings-row__text">
+        <label className="settings-row__label" htmlFor={id}>
+          {label}
+        </label>
+        <p className="settings-row__desc" id={descriptionId}>
+          {description}
+        </p>
+      </div>
+      <div className="settings-row__control">
         <input
+          id={id}
+          className="input number"
           type="number"
           min={min}
           max={max}
           step={step}
+          title={`${min} – ${max} ${unit}`}
           value={draft}
+          aria-describedby={descriptionId}
           onChange={(event) => setDraft(event.target.value)}
           onFocus={(event) => event.currentTarget.select()}
           onBlur={commit}
@@ -1410,10 +1620,9 @@ function NumberField({
             }
           }}
         />
-        <span className="st-unit">{unit}</span>
-      </span>
-      {hint ? <span className="st-num-hint">{hint}</span> : null}
-    </label>
+        <span className="settings-unit">{unit}</span>
+      </div>
+    </div>
   );
 }
 
@@ -1422,22 +1631,24 @@ function NumberField({
  * 避免连续拖动触发大量 settings IPC 写入。
  */
 function RangeField({
+  id,
   label,
+  description,
   value,
   min,
   max,
   step,
   format,
-  hint,
   onCommit,
 }: {
+  id: string;
   label: string;
+  description: string;
   value: number;
   min: number;
   max: number;
   step: number;
   format: (value: number) => string;
-  hint?: string;
   onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(value);
@@ -1445,6 +1656,7 @@ function RangeField({
   const valueRef = useRef(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCommitRef = useRef(onCommit);
+  const descriptionId = `${id}-desc`;
 
   useEffect(() => {
     onCommitRef.current = onCommit;
@@ -1481,27 +1693,34 @@ function RangeField({
     timerRef.current = setTimeout(commitDraft, 260);
   };
 
+  // 轨道左侧实心部分 = 当前值在原范围内的比例（令牌配色见 components.css 的 .range）
+  const fillPercent = max > min ? Math.min(100, Math.max(0, ((draft - min) / (max - min)) * 100)) : 0;
+
   return (
-    <div className="st-slider-field">
-      <div className="st-slider-top">
-        <span className="st-slider-label">{label}</span>
-        <span className="st-slider-value">{format(draft)}</span>
+    <div className="settings-row">
+      <div className="settings-row__text">
+        <label className="settings-row__label" htmlFor={id}>
+          {label}
+        </label>
+        <p className="settings-row__desc" id={descriptionId}>
+          {description}
+        </p>
       </div>
-      <input
-        className="st-range"
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={draft}
-        aria-label={label}
-        onChange={(event) => handleChange(Number(event.target.value))}
-      />
-      <div className="st-slider-scale">
-        <span>{format(min)}</span>
-        <span>{format(max)}</span>
+      <div className="settings-row__control">
+        <input
+          id={id}
+          className="range"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={draft}
+          aria-describedby={descriptionId}
+          style={{ '--range-fill': `${fillPercent}%` } as CSSProperties}
+          onChange={(event) => handleChange(Number(event.target.value))}
+        />
+        <span className="settings-range__value">{format(draft)}</span>
       </div>
-      {hint ? <span className="st-slider-hint">{hint}</span> : null}
     </div>
   );
 }
