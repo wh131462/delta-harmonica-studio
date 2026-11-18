@@ -58,7 +58,7 @@ npm run dist:mac     # macOS：dmg + zip（默认当前架构）
 npm run dist:linux   # Linux：AppImage + deb（默认当前架构）
 ```
 
-- 打包必须在目标系统上执行：dmg / 公证依赖 macOS 工具链，AppImage / deb 依赖 Linux 工具链。
+- 打包必须在目标系统上执行：dmg 依赖 macOS 工具链，AppImage / deb 依赖 Linux 工具链。
 - 同时构建双架构：`npm run dist:mac -- --x64 --arm64`。`koffi` 是 N-API 预编译模块，配置里已关闭 `npmRebuild`，因此可以在同一台机器上产出 Intel 与 Apple Silicon 两套包；macOS 版不会加载 koffi，所以不存在架构不匹配的运行问题。
 - Linux arm64：在 arm64 机器（或 `ubuntu-24.04-arm` runner）上执行 `npm run dist:linux -- --arm64`，同时把 `electron-builder.yml` 的 `linux.target` 保持在 AppImage / deb 即可。
 - 产物命名：`delta-harmonica-<version>-mac-<arch>.dmg|zip`、`delta-harmonica-<version>-linux-<arch>.AppImage|deb`、Windows 见 `electron-builder.yml`。
@@ -68,33 +68,30 @@ npm run dist:linux   # Linux：AppImage + deb（默认当前架构）
 
 `assets/icon.png`（512×512）是 electron-builder 的 buildResources，同时用于 Linux 图标与 macOS `.icns`、Windows `.ico` 的自动转换。若替换为更高分辨率（1024×1024）可获得更清晰的 Retina / 高分屏图标。
 
-## 5. macOS 签名与公证
+## 5. macOS 签名与首次打开
 
-默认情况下 macOS 产物**未签名、未公证**：
+本项目**不做代码签名与公证**，仓库不需要任何签名相关 Secret：
 
-- `scripts/after-pack.cjs` 会在没有 `CSC_LINK` / `CSC_NAME` 时执行 `codesign --force --deep --sign -`，做 ad-hoc 签名，保证 Apple Silicon 上可以启动。
-- 用户首次打开需要在「系统设置 → 隐私与安全性」中允许，或右键应用选择「打开」；仍被拦截时可执行：
+- Windows / Linux 产物未签名；macOS 产物未做开发者签名与公证。
+- `scripts/after-pack.cjs` 会执行 `codesign --force --deep --sign -` 做 ad-hoc 签名，保证 Apple Silicon 上可以启动（ad-hoc 不是开发者签名，不会改变 Gatekeeper 的拦截行为）。
+- 用户首次打开需要按以下任一方式放行（发布描述里的「🍎 macOS 首次打开放行」一节会原样给出这些步骤）：
+  1. 右键应用 → 「打开」→ 再点「打开」；若提示「无法检查是否包含恶意软件」，到「系统设置 → 隐私与安全性」点「仍要打开」。
+  2. 清除隔离属性：
 
-```bash
-xattr -cr "/Applications/三角洲口琴工坊.app"
-```
+     ```bash
+     xattr -cr "/Applications/三角洲口琴工坊.app"
+     ```
 
-配置正式签名（可选）：
+  3. 允许「任何来源」：
 
-```bash
-export CSC_LINK=/path/to/certificate.p12     # 或 base64
-export CSC_KEY_PASSWORD=********
-npm run dist:mac
-```
+     ```bash
+     sudo spctl --master-disable   # 打开
+     sudo spctl --master-enable    # 恢复默认
+     ```
 
-公证需要 Apple Developer 账号，在 `electron-builder.yml` 的 `mac` 段补充：
+     macOS 15（Sequoia）起系统移除了图形界面中的「任何来源」，该命令在 15 及之后版本也不再生效，请改用方式 1 或 2。
 
-```yaml
-mac:
-  notarize: true
-```
-
-并设置 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`。CI 中把上述值放到仓库 Secrets，发布工作流已经预留 `CSC_LINK` / `CSC_KEY_PASSWORD` 环境变量。
+若以后要接入正式签名与公证，在发布工作流里重新引入 `CSC_LINK` / `CSC_KEY_PASSWORD` Secrets，并在 `electron-builder.yml` 的 `mac` 段配置 `notarize: true`，同时设置 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`。
 
 ## 6. Linux 运行说明
 
@@ -113,7 +110,7 @@ mac:
 
 ## 7. CI 与发布
 
-仓库内置两个 GitHub Actions 工作流：
+仓库内置三个 GitHub Actions 工作流：
 
 ### CI（`.github/workflows/ci.yml`）
 
@@ -123,7 +120,7 @@ mac:
 
 ### Release（`.github/workflows/release.yml`）
 
-- 触发：推送 `v*` 标签（`workflow_dispatch` 只构建、不发布）
+- 触发：推送 `v*` 标签；或在 Actions 里手动触发（可填版本号、可选只出包不发布）
 - 矩阵与产线：
 
   | 名称 | Runner | 参数 | 产物 |
@@ -132,8 +129,9 @@ mac:
   | macos-x64-and-arm64 | `macos-latest` | `--mac --x64 --arm64` | `*.dmg` / `*.zip`（两种架构） |
   | linux-x64 | `ubuntu-latest` | `--linux --x64` | `*.AppImage` / `*.deb` |
 
-- 每个任务先校验 `resources/audio-samples` 存在，再执行类型检查、单元测试与打包。
-- 发布任务汇总所有产物，生成 `SHA256SUMS.txt`，通过 `softprops/action-gh-release` 创建 GitHub Release 并附平台说明。
+- `prepare` 作业先解析版本号（显式输入 → tag 名 → 提交信息规则 `feat: vX.Y.Z` → `package.json`）并用 `scripts/release-notes.mjs` 生成发布描述，三端构建统一采用该版本号。
+- 每个构建任务先校验 `resources/audio-samples` 存在，再执行类型检查、单元测试与打包。
+- 发布任务汇总所有产物，生成 `SHA256SUMS.txt`，通过 `softprops/action-gh-release` 创建 GitHub Release，描述即自动生成的「版本信息 + 特性/修复表格 + 下载清单 + 平台说明」。
 
 发布新版本：
 
@@ -141,6 +139,14 @@ mac:
 npm version patch          # 或 minor / major
 git push --follow-tags
 ```
+
+也可在 Actions → Release → Run workflow 手动指定版本号发布。完整触发方式、规则检索与本地预览见 [发布流程](RELEASE.md)。
+
+### Auto Release（`.github/workflows/auto-release.yml`）
+
+- 触发：向 `master` / `main` 推送提交。
+- 只在本次推送的提交里检索版本标记（`feat: v1.2.3` / `chore(release): v1.2.3`）；命中且 tag 不存在时创建 tag，再 `workflow_dispatch` 触发 Release 工作流（`GITHUB_TOKEN` 推 tag 不会触发其它工作流，`workflow_dispatch` 是官方例外）。
+- 关掉自动发版：仓库 Variables 设置 `AUTO_RELEASE=false`。
 
 ## 8. 验收清单
 

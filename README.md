@@ -7,6 +7,7 @@ Windows 版可以把键鼠事件注入游戏；macOS 与 Linux 版保留编辑�
 软件不修改游戏文件，也不读取游戏内存；向游戏发送的输入全部通过 Windows 键鼠输入 API 模拟完成。
 
 - 平台：Windows 10 / 11 x64（完整功能）；macOS 12+（Intel / Apple Silicon）与 Linux x64（无游戏注入）
+- 官网：<https://wh131462.github.io/delta-harmonica-studio/>（下载安装包、查看界面与在线交互演示）
 - 许可：MIT
 
 ## 免责声明
@@ -61,7 +62,7 @@ Windows 版可以把键鼠事件注入游戏；macOS 与 Linux 版保留编辑�
 安装包与已知限制：
 
 - **Windows**：NSIS 安装包 + 便携版，可执行文件名 `DeltaHarmonicaStudio.exe`；首次使用建议以管理员身份运行，否则游戏会静默丢弃模拟按键。
-- **macOS**：`.dmg` + `.zip`，同时提供 Intel（x64）与 Apple Silicon（arm64）构建。未配置 Developer ID 时产物未签名、未公证（arm64 已做 ad-hoc 签名），首次打开请右键「打开」，或在「系统设置 → 隐私与安全性」中允许。
+- **macOS**：`.dmg` + `.zip`，同时提供 Intel（x64）与 Apple Silicon（arm64）构建。产物不做代码签名与公证（arm64 仅做 ad-hoc 签名），首次打开请右键「打开」，或在「系统设置 → 隐私与安全性」点「仍要打开」；提示「已损坏」时执行 `xattr -cr "/Applications/三角洲口琴工坊.app"`；允许「任何来源」可执行 `sudo spctl --master-disable`（macOS 15 起系统已移除该开关）。详见 [macOS 首次打开放行](docs/PLATFORM_SUPPORT.md#5-macos-签名与首次打开)。
 - **Linux**：`.AppImage` + `.deb`。AppImage 需要先 `chmod +x`；Ubuntu 22.04+ 若提示缺少 FUSE，可安装 `libfuse2` 或使用 `--appimage-extract-and-run`。Wayland 下悬浮窗的位置与置顶由合成器决定，独占全屏时可能不可见；X11 下行为与 Windows 一致。
 - 宏文件本身面向 Windows 宏软件（AutoHotkey / 罗技 G HUB）；在 macOS / Linux 上可以导出、查看与按 CSV 时序表自行录入。
 
@@ -106,7 +107,7 @@ npm run dist:dir     # 只生成未打包目录，便于快速验证
 
 可执行文件名称为 `DeltaHarmonicaStudio`（Windows 下为 `DeltaHarmonicaStudio.exe`）：可执行文件使用 ASCII 名以规避中文文件名下的原生崩溃风险；窗口标题、快捷方式与安装界面仍显示「三角洲口琴工坊」。
 
-打包必须在目标系统上执行（macOS 的 dmg / 公证依赖 Xcode 工具，Linux 的 AppImage / deb 依赖 Linux 工具链）。仓库内置 [GitHub Actions 发布工作流](.github/workflows/release.yml)，推 `v*` 标签即可在 Windows、macOS（Intel / Apple Silicon）与 Linux 上分别构建并汇总到 Release。
+打包必须在目标系统上执行（macOS 的 dmg 依赖 Xcode 工具，Linux 的 AppImage / deb 依赖 Linux 工具链）。仓库内置 [GitHub Actions 发布工作流](.github/workflows/release.yml)：推 `v*` 标签，或在 Actions 里手动触发并指定版本号，都会在 Windows、macOS（Intel / Apple Silicon）与 Linux 上分别构建并汇总到 Release；把带版本标记的提交（`feat: v1.2.3`）合进主干还会由 [自动发版工作流](.github/workflows/auto-release.yml) 自动打 tag 并发版。发布描述由提交规则自动生成（版本信息、特性 / 修复表格、下载清单、macOS 放行说明），详见 [发布流程](docs/RELEASE.md)。
 
 ## 使用
 
@@ -235,12 +236,13 @@ src/
 resources/audio-samples # 随安装包分发的口琴 / 钢琴采样
 assets/icon.png         # 应用图标（electron-builder 的 buildResources，自动转 Windows .ico / macOS .icns）
 tests/                  # Vitest 单元测试
-docs/                   # 产品设计、平台支持文档与界面截图
-scripts/                # 开发、探针、截图、签名与打包辅助脚本
-.github/workflows/      # Windows / macOS / Linux 三端 CI 与发布工作流
+site/                   # 静态官网（GitHub Pages：npm run site:build / site:preview）
+docs/                   # 产品设计、平台支持、官网部署文档与界面截图
+scripts/                # 开发、探针、截图、签名、打包与官网构建辅助脚本
+.github/workflows/      # Windows / macOS / Linux 三端 CI、发布与自动发版工作流；含 Pages 官网部署
 ```
 
-`out/`（electron-vite 构建）、`release/`（安装包）、`artifacts/`（截图与验收日志）以及旧版 `build/` 目录都是生成物，已在 `.gitignore` 中忽略。
+`out/`（electron-vite 构建）、`release/`（安装包）、`dist-site/`（官网构建）、`artifacts/`（截图与验收日志）以及旧版 `build/` 目录都是生成物，已在 `.gitignore` 中忽略。
 
 技术栈：Electron、React、TypeScript、electron-vite、Vitest，以及用于键盘鼠标注入的 koffi 和用于 MIDI 解析的 `@tonejs/midi`。
 
@@ -271,7 +273,7 @@ npm run typecheck    # TypeScript 全量类型检查
 ## 已知限制
 
 - macOS / Linux 版不提供游戏注入（游戏只有 Windows 客户端），「开始演奏」以排练模式走时间轴；编辑、导入、练习、试听与宏导出不受影响。
-- macOS 包默认未签名、未公证：首次打开需右键「打开」或在「系统设置 → 隐私与安全性」中允许；Apple Silicon 构建已做 ad-hoc 签名。Linux AppImage 需要 `chmod +x`，部分发行版还需要 `libfuse2`。
+- macOS 包未签名、未公证：首次打开需右键「打开」或在「系统设置 → 隐私与安全性」点「仍要打开」，提示「已损坏」时用 `xattr -cr` 清除隔离属性，需要时可用 `sudo spctl --master-disable` 打开「任何来源」（macOS 15 起系统已移除该开关）；Apple Silicon 构建已做 ad-hoc 签名。Linux AppImage 需要 `chmod +x`，部分发行版还需要 `libfuse2`。
 - Wayland 下悬浮窗的位置、透明与置顶由桌面合成器决定；X11 下行为与 Windows 一致。
 - 宏导出文件面向 Windows 宏软件（AutoHotkey / 罗技 G HUB）；在 macOS / Linux 上可导出与查看，CSV 时序表可自行录入其他工具。
 - 游戏内绝对音高未公开，软件按「音级 + 八度偏移」相对建模（约定 1 = C4 = 60），不影响游戏实际发声。
@@ -292,6 +294,8 @@ npm run typecheck    # TypeScript 全量类型检查
 
 - [产品设计文档](docs/PRODUCT_DESIGN.md)：产品定位、功能设计、交互、数据模型、架构、安全与限制。
 - [平台支持与发布](docs/PLATFORM_SUPPORT.md)：Windows / macOS / Linux 能力矩阵、构建、签名、CI 发布与验收清单。
+- [发布流程](docs/RELEASE.md)：tag 发布与手动触发、版本号规则检索、发布描述结构与本地预览。
+- [静态官网与 Pages 部署](docs/WEBSITE.md)：站点结构、本地预览、构建流程与 GitHub Pages 工作流。
 
 ## 许可
 
