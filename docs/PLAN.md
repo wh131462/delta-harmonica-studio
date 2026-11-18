@@ -326,3 +326,73 @@ interface ScoreMeta {
 4. 可选 basic-pitch ONNX 提升转谱质量；音频分离（UVR/Demucs）可选组件。
 5. MIDI/WAV 导出、内置曲库扩充与来源核对表。
 6. 游戏窗口状态识别（仅本地截图，不读内存）与歌词/演奏进度悬浮窗。
+
+---
+
+## 16. v0.2 升级记录（UI / 悬浮窗 / 热键 / 双音色 / 主旋律扒谱）
+
+### 16.1 目标
+
+在不改变既有注入/排程核心的前提下，按「UI 完整优化 + 新功能」要求完成：①悬浮操作界面与全局快捷键；②应用内试听（口琴/钢琴双音色）；③扒谱以主旋律为核心；④整体 UI/UX 重做。
+
+### 16.2 应用外壳重构
+
+- 旧结构：Sidebar + StatusBar + 页面滚动，播放控制只在演奏台。
+- 新结构：`Sidebar + TopBar + 页面滚动 + 底部常驻 TransportBar`；顶栏显示当前曲谱/输入通道状态/热键提示/悬浮窗入口；底部播放条提供双音色试听、音量、进度、开始/停止/急停与快捷键提示。
+- 新增全局上下文：
+  - `PreviewProvider`：试听状态与音色/音量，任何页面可调用；
+  - `PerformanceProvider`：当前曲谱的演奏计划、移调/速度、安全确认、开始/停止、进度与音符高亮；F9 命令与自动测试模式统一在此处理。
+- 页面级重做：演奏台（谱面 + 演奏设置/计划/键位谱 Tab）、编辑器（每行小节数/缩放/内嵌试听）、智能导入（主旋律参数/拖拽/双音色 A/B）、方案库（搜索/筛选/排序/网格列表/批量管理）、设置（6 个 Tab）。
+
+### 16.3 悬浮控制窗
+
+- 独立 `BrowserWindow`：`frame:false, transparent:true, alwaysOnTop:'screen-saver', skipTaskbar:true, focusable:false, showInactive()`，不抢游戏焦点；
+- 页面 `src/renderer/src/overlay/OverlayRoot.tsx`，通过 `overlay:state` 接收主窗口同步的曲谱/播放状态/快捷键；
+- 主进程 `OverlayWindowManager`：位置持久化（moved 防抖写设置）、透明度/置顶/显隐、`resetPosition`（position=null 回右下角）；
+- 按钮 → `overlay:command` → 主进程分发（开始/停止/急停/显示主窗口/隐藏悬浮窗）；
+- 限制：独占全屏游戏无法被覆盖，需无边框窗口；透明窗口自截图验证 alpha 正确（角落 α≈3、卡片 α≈240）。
+
+### 16.4 可配置全局快捷键
+
+- `HotkeyManager`（主进程）统一 `globalShortcut` 注册/注销、重复组合检测、注册失败原因记录；
+- 设置页 `HotkeyRecorder` 捕获组合键生成 Electron accelerator，保存后调用 `settings:update`，主进程同步重建注册并返回状态；
+- 录制期间通过 `hotkeys:setRecording` 临时注销全部热键，避免录制 F9 时误触；
+- 默认：`F9` 开始/停止、`F10` 急停、`Ctrl+Alt+O` 悬浮窗、`Ctrl+Alt+M` 主窗口（本机 4/4 注册成功；初版 F12/F8 被系统占用已替换）。
+
+### 16.5 双音色试听
+
+- 纯 Web Audio 合成，无外部采样：
+  - 口琴：PeriodicWave 簧片泛音 + 慢起音/渐强 + 5.3Hz 轻颤音 + 带通气流声；
+  - 钢琴：击弦瞬态 + 泛音列 + 指数衰减 + 轻微失谐 + 击弦噪声；
+- 每个音符按演奏计划的 `startMs/holdMs` 绝对排程，与注入计划共享同一份 `PlaybackPlan`；
+- 音量/音色持久化到 `settings.preview`。
+
+### 16.6 主旋律提取（音频扒谱）
+
+新增纯 TS 模块（零依赖、Node 可测）：
+
+- `hpss.ts`：Hann 1024/hop 256 STFT，时间轴/频率轴中值滤波 HPSS + Wiener 软掩码，可选重建谐波时域信号；
+- `salience.ts`：对数压缩 + 噪声底扣除 + 1~6 次谐波累加 + 基频支撑度加权 + 音域先验；`estimatePolyphonyScore` 输出复音程度；
+- `melody.ts`：归一化/降采样 → HPSS → 谱通量起音 + BPM → 显著度 → auto 选路；
+  - monophonic：YIN + 迟滞切分；
+  - polyphonic：Viterbi（音高连续性/大跳/超八度惩罚/起音换音折扣 + skyline 顶音加权）+ 八度校正；
+  - 两遍切分、碎音合并、最短音符过滤、音域约束（默认 C3–C6）、maxNotes 截断、warnings/置信度。
+- 集成：`renderer/src/audio/melody-adapter.ts` 映射 `AudioAnalysisSettings`，异常回退单声部 YIN；导入页展示 method/BPM/置信度/有声帧占比。
+- 性能：60s 44.1kHz 合成音频 0.72s（要求 <6s）。
+
+### 16.7 验收
+
+- `npm test`：**195 passed / 1 skipped**（新增主旋律 16 项）；
+- `npm run typecheck`、`npm run build` 全绿；
+- 悬浮窗渲染截图 + 按钮点击 IPC 链路（`overlay command=toggle-play`）验证通过；
+- 4 个默认全局热键注册成功；录制暂停逻辑已接线；
+- 截图：`docs/screenshots/ui-play.png / ui-editor.png / ui-import.png / ui-library.png / ui-settings.png / ui-overlay.png`。
+
+### 16.8 v0.2 遗留
+
+1. 悬浮窗在独占全屏下不可见（系统限制，文档已说明；建议无边框窗口）；
+2. 悬浮窗按钮的实机点击手感（focusable:false 下）仍需真机确认，必要时提供「鼠标穿透/可聚焦」开关；
+3. 主旋律提取在强混响/旋律被掩蔽/低音区主旋律场景仍可能跳八度；
+4. 热键被系统/游戏占用时需用户改绑（设置页已提示）；
+5. 方案库「游戏任务曲」仍用标题关键词近似，后续加 tag 字段。
+

@@ -22,6 +22,9 @@ export type IconName =
   | 'clock'
   | 'target'
   | 'headphones'
+  | 'overlay'
+  | 'pause'
+  | 'volume'
   | 'plus';
 
 const PATHS: Record<IconName, JSX.Element> = {
@@ -131,6 +134,26 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M4.5 13v-1a7.5 7.5 0 0 1 15 0v1" />
       <rect x="3.5" y="12.5" width="4" height="6.5" rx="1.6" />
       <rect x="16.5" y="12.5" width="4" height="6.5" rx="1.6" />
+    </>
+  ),
+  overlay: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="12" rx="2" />
+      <path d="M3.5 8h17" />
+      <rect x="12" y="12" width="9" height="7.5" rx="1.8" fill="currentColor" fillOpacity="0.18" />
+      <path d="M14 14h5M14 16.4h3.2" />
+    </>
+  ),
+  pause: (
+    <>
+      <rect x="7" y="5.5" width="3.4" height="13" rx="1" fill="currentColor" stroke="none" />
+      <rect x="13.6" y="5.5" width="3.4" height="13" rx="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  volume: (
+    <>
+      <path d="M4 10v4h3l4.5 3.5v-11L7 10H4Z" />
+      <path d="M15 9.2a4 4 0 0 1 0 5.6M17.6 7a7 7 0 0 1 0 10" />
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,

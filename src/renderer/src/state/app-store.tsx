@@ -9,7 +9,7 @@ import type {
   WindowInfo,
 } from '@shared/types';
 import type { Score } from '@core/model/score';
-import { DEFAULT_SETTINGS } from '@shared/settings';
+import { DEFAULT_SETTINGS, mergeSettings } from '@shared/settings';
 
 export type PageId = 'play' | 'editor' | 'import' | 'library' | 'settings';
 
@@ -30,6 +30,7 @@ export interface AppStore {
   playbackStatus: PlaybackStatus;
   inputCheck: InputCheck | null;
   windows: WindowInfo[];
+  overlayVisible: boolean;
   selfTestOpen: boolean;
   lastGlobalCommand: { command: GlobalCommand; nonce: number } | null;
   toast: ToastMessage | null;
@@ -45,6 +46,7 @@ export interface AppStore {
   refreshWindows(): Promise<void>;
   showToast(kind: ToastMessage['kind'], text: string): void;
   setSelfTestOpen(open: boolean): void;
+  setOverlayVisible(visible: boolean): Promise<void>;
 }
 
 const AppStoreContext = createContext<AppStore | null>(null);
@@ -62,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>({ state: 'idle' });
   const [inputCheck, setInputCheck] = useState<InputCheck | null>(null);
   const [windows, setWindows] = useState<WindowInfo[]>([]);
+  const [overlayVisible, setOverlayVisibleState] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [selfTestOpen, setSelfTestOpen] = useState(false);
   const [lastGlobalCommand, setLastGlobalCommand] = useState<{ command: GlobalCommand; nonce: number } | null>(null);
@@ -168,12 +171,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
 
   const updateSettings = useCallback(
     async (patch: Partial<AppSettings>) => {
-      setSettings((previous) => ({
-        ...previous,
-        ...patch,
-        input: { ...previous.input, ...(patch.input ?? {}), timing: { ...previous.input.timing, ...(patch.input?.timing ?? {}) } },
-        audio: { ...previous.audio, ...(patch.audio ?? {}) },
-      }));
+      setSettings((previous) => mergeSettings(previous, patch));
       try {
         const next = await window.api.settings.update(patch);
         setSettings(next);
@@ -183,6 +181,19 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
       }
     },
     [refreshInputCheck, showToast],
+  );
+
+  const setOverlayVisible = useCallback(
+    async (visible: boolean) => {
+      try {
+        const actual = await window.api.overlay.setVisible(visible);
+        setOverlayVisibleState(actual);
+        setSettings((previous) => ({ ...previous, overlay: { ...previous.overlay, visible: actual } }));
+      } catch (error) {
+        showToast('error', `悬浮窗操作失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+    [showToast],
   );
 
   // 初始化：应用信息 / 设置 / 曲库 / 输入状态
@@ -199,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
         setAppInfo(info);
         setSettings(loadedSettings);
         setEntries(list);
+        setOverlayVisibleState(loadedSettings.overlay.visible);
         // 启动时自动载入最近编辑的曲谱，演奏台/编辑器可直接看到内容
         if (list.length > 0) {
           try {
@@ -242,6 +254,52 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
     return unsubscribe;
   }, []);
 
+  // 启动时自动选中疑似游戏窗口（仅当用户尚未选择目标窗口）
+  useEffect(() => {
+    if (!ready || windows.length === 0) return;
+    if (settings.input.targetWindowHandle) return;
+    const candidate = windows.find((item) => item.looksLikeGame);
+    if (!candidate) return;
+    void updateSettings({
+      input: {
+        ...settings.input,
+        targetWindowHandle: candidate.handle,
+        targetWindowTitle: candidate.title,
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, windows, settings.input.targetWindowHandle]);
+
+  // 悬浮窗显隐状态同步
+  useEffect(() => {
+    const unsubscribe = window.api.overlay.onVisibility((visible) => {
+      setOverlayVisibleState(visible);
+      setSettings((previous) => ({ ...previous, overlay: { ...previous.overlay, visible } }));
+    });
+    return unsubscribe;
+  }, []);
+
+  // 把当前曲谱 / 播放状态 / 快捷键持久同步给悬浮窗
+  useEffect(() => {
+    void window.api.overlay.syncState({
+      title: currentScore?.meta.title ?? '未选择曲谱',
+      playback: playbackStatus,
+      hotkeys: settings.hotkeys,
+      backend: settings.input.backend,
+      targetWindowTitle: settings.input.targetWindowTitle,
+      overlayVisible,
+      showHotkeyHint: settings.overlay.showHotkeyHint,
+    });
+  }, [
+    currentScore?.meta.title,
+    playbackStatus,
+    settings.hotkeys,
+    settings.input.backend,
+    settings.input.targetWindowTitle,
+    overlayVisible,
+    settings.overlay.showHotkeyHint,
+  ]);
+
   const value = useMemo<AppStore>(
     () => ({
       ready,
@@ -254,6 +312,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
       playbackStatus,
       inputCheck,
       windows,
+      overlayVisible,
       selfTestOpen,
       lastGlobalCommand,
       toast,
@@ -269,6 +328,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
       refreshWindows,
       showToast,
       setSelfTestOpen,
+      setOverlayVisible,
     }),
     [
       ready,
@@ -281,6 +341,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
       playbackStatus,
       inputCheck,
       windows,
+      overlayVisible,
       selfTestOpen,
       lastGlobalCommand,
       toast,
@@ -295,6 +356,7 @@ export function AppProvider({ children }: { children: ReactNode }): JSX.Element 
       refreshInputCheck,
       refreshWindows,
       showToast,
+      setOverlayVisible,
     ],
   );
 

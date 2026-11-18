@@ -1,0 +1,214 @@
+/* 悬浮控制窗：透明背景 + 半透明玻璃卡片 */
+
+html.overlay-mode,
+html.overlay-mode body,
+html.overlay-mode #root {
+  background: transparent !important;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  user-select: none;
+}
+
+.ov-shell {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.ov-card {
+  height: 100%;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(20, 29, 44, 0.94), rgba(9, 14, 22, 0.94));
+  border: 1px solid rgba(246, 177, 59, 0.35);
+  box-shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+}
+
+.ov-drag {
+  -webkit-app-region: drag;
+  padding: 10px 14px 4px;
+  cursor: grab;
+}
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  color: rgba(200, 214, 235, 0.62);
+  letter-spacing: 0.4px;
+}
+
+.ov-brand {
+  font-weight: 700;
+  color: rgba(246, 177, 59, 0.9);
+}
+
+.ov-state {
+  margin-left: auto;
+  font-size: 10px;
+  color: rgba(200, 214, 235, 0.55);
+}
+
+.ov-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.ov-dot.active {
+  background: #35d399;
+  box-shadow: 0 0 8px rgba(53, 211, 153, 0.8);
+}
+
+.ov-dot.countdown {
+  background: #f6b13b;
+  box-shadow: 0 0 8px rgba(246, 177, 59, 0.8);
+  animation: ov-pulse 1s infinite;
+}
+
+@keyframes ov-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.ov-title {
+  margin-top: 4px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #eef4ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ov-sub {
+  margin-top: 1px;
+  font-size: 10.5px;
+  color: rgba(160, 178, 204, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ov-body {
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.ov-progress {
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.ov-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f6b13b, #ffd67a);
+  transition: width 0.12s linear;
+}
+
+.ov-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 24px;
+  color: #ffd67a;
+}
+
+.ov-countdown strong {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ov-countdown span {
+  font-size: 10.5px;
+  color: rgba(200, 214, 235, 0.7);
+}
+
+.ov-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  -webkit-app-region: no-drag;
+}
+
+.ov-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 15px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.1);
+  color: #dbe7fa;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.ov-btn:hover {
+  filter: brightness(1.15);
+}
+
+.ov-btn.primary {
+  background: linear-gradient(135deg, #ffc85c, #ef9a1e);
+  border-color: rgba(246, 177, 59, 0.6);
+  color: #241703;
+}
+
+.ov-btn.stop {
+  background: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #ffc9c9;
+}
+
+.ov-btn.danger {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #ffb1b1;
+  padding: 7px 11px;
+}
+
+.ov-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.08);
+  color: rgba(200, 214, 235, 0.75);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.ov-icon:hover {
+  color: #fff;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.ov-hints {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 9.5px;
+  color: rgba(160, 178, 204, 0.5);
+  margin-top: auto;
+}

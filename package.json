@@ -1,8 +1,8 @@
 {
   "name": "delta-harmonica-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "三角洲行动·守夜人口琴 自动演奏工作台：简谱编辑 / MIDI·音频分析转谱 / 演奏方案管理 / 低延迟键鼠注入",
+  "description": "三角洲行动·守夜人口琴 自动演奏工作台：简谱编辑 / MIDI·音频分析转谱（主旋律优先）/ 悬浮控制窗 / 可配置全局热键 / 双音色试听 / 音乐方案管理 / 高精度键鼠注入",
   "main": "./out/main/index.js",
   "license": "MIT",
   "author": "auto-player",
@@ -14,5 +14,29 @@
     "koffi": "^3.3.8",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.cjs",
+    "build": "electron-vite build",
+    "start": "node scripts/run-electron.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "screenshot": "node scripts/screenshot.cjs",
+    "probe:input": "node scripts/probe-input3.cjs",
+    "dist": "electron-vite build && electron-builder --win --config electron-builder.yml",
+    "dist:dir": "electron-vite build && electron-builder --win --dir --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^45.3.4",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   }
 }

@@ -7,7 +7,7 @@ import { ScoreView } from '@renderer/components/score';
 import { Icon } from '@renderer/components/Icon';
 import { PageHeader } from '@renderer/components/PageHeader';
 import { useAppStore } from '@renderer/state/app-store';
-import { PreviewPlayer, type PreviewHandle } from '@renderer/audio/preview';
+import { usePreview } from '@renderer/audio/preview-context';
 import { keyLabel } from '@renderer/utils/format';
 
 const QUICK_DURATIONS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
@@ -18,13 +18,11 @@ export function EditorPage(): JSX.Element {
   const [workingScore, setWorkingScore] = useState<Score | null>(null);
   const [diagnostics, setDiagnostics] = useState<ParseDiagnostic[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [measuresPerRow, setMeasuresPerRow] = useState(4);
+  const [zoom, setZoom] = useState(1);
   const skipParseRef = useRef(false);
   const scoreRef = useRef<Score | null>(null);
-  const previewPlayerRef = useRef<PreviewPlayer | null>(null);
-  const previewHandleRef = useRef<PreviewHandle | null>(null);
-  const previewStartRef = useRef<number | null>(null);
+  const preview = usePreview();
   const initializedRef = useRef<string | 'draft' | null>(null);
   scoreRef.current = workingScore;
 
@@ -121,14 +119,6 @@ export function EditorPage(): JSX.Element {
     setSelectedNoteId(note.id);
   };
 
-  const stopPreview = useCallback(() => {
-    previewHandleRef.current?.stop();
-    previewHandleRef.current = null;
-    previewPlayerRef.current?.stop();
-    previewStartRef.current = null;
-    setPreviewing(false);
-  }, []);
-
   const plan = useMemo(() => {
     if (!workingScore) return null;
     try {
@@ -139,57 +129,33 @@ export function EditorPage(): JSX.Element {
   }, [workingScore, app.settings.input.timing]);
 
   const activeNoteId = useMemo(() => {
-    if (!plan || !workingScore) return null;
+    if (!plan || !workingScore || !preview.playing) return null;
+    const elapsed = preview.elapsedMs;
     let currentIndex = -1;
     for (let index = 0; index < plan.notes.length; index += 1) {
-      if (plan.notes[index].startMs <= elapsedMs) currentIndex = index;
+      if (plan.notes[index].startMs <= elapsed) currentIndex = index;
       else break;
     }
     if (currentIndex < 0) return null;
     const plannedNote = plan.notes[currentIndex];
-    if (elapsedMs > plannedNote.endMs + 200) return null;
+    if (elapsed > plannedNote.endMs + 200) return null;
     return (
       workingScore.notes.find(
         (note) => note.degree !== 0 && Math.abs(note.startBeat - plannedNote.startBeat) < 0.01,
       )?.id ?? null
     );
-  }, [plan, workingScore, elapsedMs]);
+  }, [plan, workingScore, preview.playing, preview.elapsedMs]);
 
-  useEffect(() => {
-    if (!previewing) {
-      setElapsedMs(0);
-      return undefined;
+  const togglePreview = () => {
+    if (preview.playing) {
+      preview.stop();
+      return;
     }
-    let frame = 0;
-    const tick = () => {
-      setElapsedMs(previewStartRef.current !== null ? performance.now() - previewStartRef.current : 0);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [previewing]);
-
-  const startPreview = async () => {
     if (!plan || plan.notes.length === 0) {
       app.showToast('warning', '当前谱面没有可演奏的音符');
       return;
     }
-    stopPreview();
-    const player = previewPlayerRef.current ?? new PreviewPlayer();
-    previewPlayerRef.current = player;
-    try {
-      const handle = await player.play(plan, {
-        onEnd: () => {
-          setPreviewing(false);
-          previewStartRef.current = null;
-        },
-      });
-      previewHandleRef.current = handle;
-      previewStartRef.current = performance.now();
-      setPreviewing(true);
-    } catch (error) {
-      app.showToast('error', `试听失败：${error instanceof Error ? error.message : String(error)}`);
-    }
+    void preview.play(plan);
   };
 
   const save = async () => {
@@ -408,11 +374,24 @@ export function EditorPage(): JSX.Element {
                   <Icon name="music" size={16} /> 谱面预览
                 </h4>
                 <div className="inline-actions">
-                  <button type="button" className="button ghost small" disabled={previewing} onClick={() => void startPreview()}>
-                    <Icon name="headphones" size={13} /> 试听
+                  <select
+                    className="select compact-select"
+                    value={measuresPerRow}
+                    title="每行小节数"
+                    onChange={(event) => setMeasuresPerRow(Number(event.target.value))}
+                  >
+                    <option value={2}>每行 2 小节</option>
+                    <option value={3}>每行 3 小节</option>
+                    <option value={4}>每行 4 小节</option>
+                  </select>
+                  <button type="button" className="button ghost small" title="缩小" onClick={() => setZoom((value) => Math.max(0.7, Math.round((value - 0.1) * 10) / 10))}>
+                    −
                   </button>
-                  <button type="button" className="button ghost small" disabled={!previewing} onClick={stopPreview}>
-                    停止
+                  <button type="button" className="button ghost small" title="放大" onClick={() => setZoom((value) => Math.min(1.6, Math.round((value + 0.1) * 10) / 10))}>
+                    +
+                  </button>
+                  <button type="button" className={`button small ${preview.playing ? 'danger' : 'ghost'}`} onClick={togglePreview}>
+                    <Icon name={preview.playing ? 'stop' : 'headphones'} size={13} /> {preview.playing ? '停止试听' : `试听（${preview.instrument === 'piano' ? '钢琴' : '口琴'}）`}
                   </button>
                 </div>
               </div>
@@ -421,7 +400,8 @@ export function EditorPage(): JSX.Element {
                   score={workingScore}
                   selectedNoteId={selectedNoteId}
                   activeNoteId={activeNoteId}
-                  measuresPerRow={4}
+                  measuresPerRow={measuresPerRow}
+                  zoom={zoom}
                   onSelectNote={(noteId) => setSelectedNoteId(noteId)}
                 />
               </div>

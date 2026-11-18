@@ -34,6 +34,65 @@ export interface InputSettings {
   serialBaudRate: number;
 }
 
+export type PreviewInstrument = 'harmonica' | 'piano';
+
+/** 应用内试听设置 */
+export interface PreviewSettings {
+  instrument: PreviewInstrument;
+  /** 0..1 */
+  volume: number;
+}
+
+/** 可配置全局快捷键（Electron accelerator 字符串，例如 F9、CommandOrControl+Alt+P） */
+export interface HotkeySettings {
+  /** 开始/停止演奏 */
+  togglePlay: string;
+  /** 紧急停止并释放所有按键 */
+  panicStop: string;
+  /** 显示/隐藏悬浮控制窗 */
+  toggleOverlay: string;
+  /** 显示主窗口 */
+  showMain: string;
+}
+
+export type HotkeyAction = keyof HotkeySettings;
+
+export interface HotkeyRegistrationStatus {
+  action: HotkeyAction;
+  accelerator: string;
+  registered: boolean;
+  error?: string;
+}
+
+/** 悬浮控制窗设置 */
+export interface OverlaySettings {
+  visible: boolean;
+  alwaysOnTop: boolean;
+  /** 0.3 - 1 */
+  opacity: number;
+  position: { x: number; y: number } | null;
+  showHotkeyHint: boolean;
+}
+
+export type MelodyAnalysisMode = 'auto' | 'monophonic' | 'polyphonic';
+
+/** 音频扒谱（主旋律提取）设置 */
+export interface AudioAnalysisSettings {
+  /** 量化网格（拍） */
+  quantizeGrid: number;
+  /** 自动检测调性 */
+  autoKey: boolean;
+  /** auto = 自动判断单声部/复音，其余为强制模式 */
+  melodyMode: MelodyAnalysisMode;
+  /** 主旋律允许音域（MIDI 音高，含端点），默认 C3-C6 */
+  pitchMin: number;
+  pitchMax: number;
+  /** 最短音符（毫秒） */
+  minNoteMs: number;
+  /** 是否做 HPSS 伴奏抑制（带伴奏歌曲推荐开启） */
+  suppressAccompaniment: boolean;
+}
+
 export interface AppSettings {
   version: 1;
   /** 首次启动风险提示是否已确认 */
@@ -42,12 +101,10 @@ export interface AppSettings {
   /** 收藏的曲谱 id */
   favorites: string[];
   input: InputSettings;
-  audio: {
-    /** 音频导入量化网格（拍） */
-    quantizeGrid: number;
-    /** 是否自动检测调性 */
-    autoKey: boolean;
-  };
+  audio: AudioAnalysisSettings;
+  hotkeys: HotkeySettings;
+  overlay: OverlaySettings;
+  preview: PreviewSettings;
 }
 
 export interface AppInfo {
@@ -155,6 +212,21 @@ export interface StartPlaybackResult {
   message?: string;
 }
 
+/** 悬浮窗发出的控制命令 */
+export type OverlayCommand = 'toggle-play' | 'stop' | 'panic-stop' | 'show-main' | 'hide-overlay';
+
+/** 主窗口同步给悬浮窗的状态（标题/快捷键等） */
+export interface OverlaySyncState {
+  title: string;
+  subtitle?: string;
+  playback: PlaybackStatus;
+  hotkeys: HotkeySettings;
+  backend: InputBackend;
+  targetWindowTitle?: string | null;
+  overlayVisible?: boolean;
+  showHotkeyHint?: boolean;
+}
+
 export interface RendererApi {
   app: {
     getInfo(): Promise<AppInfo>;
@@ -194,6 +266,18 @@ export interface RendererApi {
   input: {
     check(): Promise<InputCheck>;
     onGlobalCommand(callback: (command: GlobalCommand) => void): () => void;
+  };
+  hotkeys: {
+    status(): Promise<HotkeyRegistrationStatus[]>;
+    /** 录制新快捷键期间临时注销全部全局热键，避免录制按键触发旧动作 */
+    setRecording(recording: boolean): Promise<void>;
+  };
+  overlay: {
+    setVisible(visible: boolean): Promise<boolean>;
+    syncState(state: OverlaySyncState): Promise<void>;
+    sendCommand(command: OverlayCommand): Promise<void>;
+    onState(callback: (state: OverlaySyncState) => void): () => void;
+    onVisibility(callback: (visible: boolean) => void): () => void;
   };
   shell: {
     openExternal(url: string): Promise<void>;

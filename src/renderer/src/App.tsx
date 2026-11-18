@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { useAppStore } from './state/app-store';
 import { Sidebar } from './components/Sidebar';
-import { StatusBar } from './components/StatusBar';
+import { TopBar } from './components/TopBar';
+import { TransportBar } from './components/TransportBar';
 import { Toast } from './components/Modal';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { SelfTestModal } from './components/SelfTestModal';
@@ -34,8 +35,8 @@ export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <Sidebar />
-      <main className="workspace">
-        <StatusBar />
+      <div className="app-main">
+        <TopBar />
         <div className="page-scroll">
           {app.page === 'play' ? <PlayPage /> : null}
           {app.page === 'editor' ? <EditorPage /> : null}
@@ -43,7 +44,8 @@ export default function App(): JSX.Element {
           {app.page === 'library' ? <LibraryPage /> : null}
           {app.page === 'settings' ? <SettingsPage /> : null}
         </div>
-      </main>
+        <TransportBar />
+      </div>
       <DisclaimerModal />
       <SelfTestModal />
       {app.toast ? <Toast kind={app.toast.kind} text={app.toast.text} /> : null}

@@ -22,6 +22,28 @@ export const DEFAULT_SETTINGS: AppSettings = {
   audio: {
     quantizeGrid: 0.25,
     autoKey: true,
+    melodyMode: 'auto',
+    pitchMin: 48,
+    pitchMax: 84,
+    minNoteMs: 70,
+    suppressAccompaniment: true,
+  },
+  hotkeys: {
+    togglePlay: 'F9',
+    panicStop: 'F10',
+    toggleOverlay: 'Ctrl+Alt+O',
+    showMain: 'Ctrl+Alt+M',
+  },
+  overlay: {
+    visible: false,
+    alwaysOnTop: true,
+    opacity: 0.96,
+    position: null,
+    showHotkeyHint: true,
+  },
+  preview: {
+    instrument: 'harmonica',
+    volume: 0.55,
   },
 };
 
@@ -36,6 +58,13 @@ export function mergeSettings(base: AppSettings, patch: Partial<AppSettings>): A
       timing: { ...base.input.timing, ...(patch.input?.timing ?? {}) },
     },
     audio: { ...base.audio, ...(patch.audio ?? {}) },
+    hotkeys: { ...base.hotkeys, ...(patch.hotkeys ?? {}) },
+    overlay: {
+      ...base.overlay,
+      ...(patch.overlay ?? {}),
+      position: patch.overlay && 'position' in patch.overlay ? patch.overlay.position ?? null : base.overlay.position,
+    },
+    preview: { ...base.preview, ...(patch.preview ?? {}) },
   };
 }
 

@@ -6,6 +6,10 @@ directories:
   output: release
   buildResources: build
 
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+
 files:
   - out/**/*
   - package.json

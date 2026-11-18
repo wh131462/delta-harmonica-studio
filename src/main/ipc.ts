@@ -9,14 +9,19 @@ import { generateKeySheet } from '@core/export/keysheet';
 import type { Score } from '@core/model/score';
 import type {
   AppInfo,
+  AppSettings,
   ExportFormat,
+  HotkeyRegistrationStatus,
   InputCheck,
+  OverlayCommand,
+  OverlaySyncState,
   PlaybackRequest,
   PickedFile,
   SaveFileRequest,
 } from '@shared/types';
 import { getWin32Bridge } from './native/win32';
 import { debugLog } from './debug';
+import type { OverlayWindowManager } from './overlay-window';
 import type { PlaybackController } from './playback-controller';
 import type { AppStorage } from './storage';
 
@@ -30,6 +35,15 @@ export interface IpcContext {
   userDataDir: string;
   startPage: string;
   version: string;
+  overlay: OverlayWindowManager;
+  /** 显示/隐藏悬浮窗，返回实际可见状态 */
+  setOverlayVisible: (visible: boolean) => boolean;
+  showMainWindow: () => void;
+  getHotkeyStatuses: () => HotkeyRegistrationStatus[];
+  /** 录制快捷键期间临时注销全局热键 */
+  setHotkeyRecording: (recording: boolean) => void;
+  /** 设置变更后刷新热键/悬浮窗外观 */
+  onSettingsUpdated: (settings: AppSettings) => void;
 }
 
 function safeFileName(title: string): string {
@@ -149,7 +163,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   });
 
   ipcMain.handle('settings:get', () => storage.getSettings());
-  ipcMain.handle('settings:update', (_event, patch) => storage.updateSettings(patch ?? {}));
+  ipcMain.handle('settings:update', async (_event, patch: Partial<AppSettings>) => {
+    const next = await storage.updateSettings(patch ?? {});
+    context.onSettingsUpdated(next);
+    return next;
+  });
 
   ipcMain.handle('library:list', () => storage.list());
   ipcMain.handle('library:load', (_event, id: string) => {
@@ -298,4 +316,39 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle('windows:list', () => getWin32Bridge().listWindows());
   ipcMain.handle('windows:focus', (_event, handle: number) => getWin32Bridge().focusWindow(handle));
   ipcMain.handle('input:check', () => buildInputCheck(context));
+
+  ipcMain.handle('hotkeys:status', (): HotkeyRegistrationStatus[] => context.getHotkeyStatuses());
+  ipcMain.handle('hotkeys:setRecording', (_event, recording: unknown) => {
+    context.setHotkeyRecording(Boolean(recording));
+    return true;
+  });
+
+  ipcMain.handle('overlay:setVisible', (_event, visible: unknown) => context.setOverlayVisible(Boolean(visible)));
+  ipcMain.handle('overlay:syncState', (_event, state: OverlaySyncState) => {
+    context.overlay.syncState(state);
+    return true;
+  });
+  ipcMain.handle('overlay:command', async (_event, command: OverlayCommand) => {
+    debugLog(`overlay command=${command}`);
+    switch (command) {
+      case 'toggle-play':
+        context.getMainWindow()?.webContents.send('input:global-command', 'toggle-play');
+        break;
+      case 'stop':
+        await context.playback.stop('已停止演奏（悬浮窗）');
+        break;
+      case 'panic-stop':
+        await context.playback.stop('紧急停止（悬浮窗）：已释放所有按键');
+        break;
+      case 'show-main':
+        context.showMainWindow();
+        break;
+      case 'hide-overlay':
+        context.setOverlayVisible(false);
+        break;
+      default:
+        break;
+    }
+    return true;
+  });
 }

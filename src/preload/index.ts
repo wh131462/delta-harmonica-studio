@@ -1,8 +1,22 @@
 /**
  * 预加载脚本：通过 contextBridge 把受控的主进程能力暴露成 window.api。
+ * 主窗口与悬浮窗使用同一份 preload；悬浮窗只使用其中一小部分 API。
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { GlobalCommand, PlaybackStatus, RendererApi } from '@shared/types';
+import type {
+  GlobalCommand,
+  HotkeyRegistrationStatus,
+  OverlayCommand,
+  OverlaySyncState,
+  PlaybackStatus,
+  RendererApi,
+} from '@shared/types';
+
+function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
 
 const api: RendererApi = {
   app: {
@@ -32,11 +46,7 @@ const api: RendererApi = {
     stop: () => ipcRenderer.invoke('playback:stop'),
     selfTest: () => ipcRenderer.invoke('playback:selfTest'),
     panicRelease: () => ipcRenderer.invoke('playback:panicRelease'),
-    onStatus: (callback) => {
-      const listener = (_event: Electron.IpcRendererEvent, status: PlaybackStatus) => callback(status);
-      ipcRenderer.on('playback:status', listener);
-      return () => ipcRenderer.removeListener('playback:status', listener);
-    },
+    onStatus: (callback) => subscribe<PlaybackStatus>('playback:status', callback),
   },
   windows: {
     list: () => ipcRenderer.invoke('windows:list'),
@@ -44,11 +54,18 @@ const api: RendererApi = {
   },
   input: {
     check: () => ipcRenderer.invoke('input:check'),
-    onGlobalCommand: (callback) => {
-      const listener = (_event: Electron.IpcRendererEvent, command: GlobalCommand) => callback(command);
-      ipcRenderer.on('input:global-command', listener);
-      return () => ipcRenderer.removeListener('input:global-command', listener);
-    },
+    onGlobalCommand: (callback) => subscribe<GlobalCommand>('input:global-command', callback),
+  },
+  hotkeys: {
+    status: () => ipcRenderer.invoke('hotkeys:status') as Promise<HotkeyRegistrationStatus[]>,
+    setRecording: (recording: boolean) => ipcRenderer.invoke('hotkeys:setRecording', recording),
+  },
+  overlay: {
+    setVisible: (visible) => ipcRenderer.invoke('overlay:setVisible', visible),
+    syncState: (state) => ipcRenderer.invoke('overlay:syncState', state),
+    sendCommand: (command: OverlayCommand) => ipcRenderer.invoke('overlay:command', command),
+    onState: (callback) => subscribe<OverlaySyncState>('overlay:state', callback),
+    onVisibility: (callback) => subscribe<boolean>('overlay:visibility', callback),
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
