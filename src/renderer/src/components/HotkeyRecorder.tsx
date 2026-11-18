@@ -264,7 +264,7 @@ export function HotkeyRecorder({
 
   const display = recording ? (pending ? `${pending} + …` : '请按下新的快捷键…') : formatAccelerator(value);
   const className = [
-    'st-recorder-trigger',
+    'settings-recorder__trigger',
     recording ? 'is-recording' : '',
     value ? '' : 'is-empty',
     conflict ? 'has-conflict' : '',
@@ -273,7 +273,7 @@ export function HotkeyRecorder({
     .join(' ');
 
   return (
-    <div className="st-recorder" ref={containerRef}>
+    <div className="settings-recorder" ref={containerRef}>
       <button
         type="button"
         className={className}
@@ -282,16 +282,16 @@ export function HotkeyRecorder({
         title={recording ? '请按下新的组合键；按 Esc 取消' : `当前：${formatAccelerator(value)}（点击录制新快捷键）`}
         aria-label={recording ? '正在录制快捷键，按 Esc 取消' : `当前快捷键 ${formatAccelerator(value)}，点击重新录制`}
       >
-        <span className="st-recorder-accel">{display}</span>
-        <span className="st-recorder-hint">{recording ? 'Esc 取消' : '点击录制'}</span>
+        <span className="settings-recorder__accel">{display}</span>
+        <span className="settings-recorder__hint">{recording ? 'Esc 取消' : '点击录制'}</span>
       </button>
       {recording && error ? (
-        <p className="st-recorder-note error">
+        <p className="settings-recorder__note is-error" role="status">
           <Icon name="warning" size={12} /> {error}
         </p>
       ) : null}
       {!recording && conflict ? (
-        <p className="st-recorder-note conflict">
+        <p className="settings-recorder__note is-conflict" role="status">
           <Icon name="warning" size={12} /> {conflict}
         </p>
       ) : null}
