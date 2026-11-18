@@ -42,6 +42,15 @@ env:
   # （Apple Silicon 由 scripts/after-pack.cjs 补 ad-hoc 签名，否则系统会判定应用「已损坏」）。
   # 首次打开的系统拦截由 Release 描述里的「macOS 首次打开放行」一节引导用户处理。
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  # 仓库 .npmrc 把 Electron / electron-builder 的二进制指向 npmmirror（给国内本地开发用），
+  # 但 GitHub 托管 runner 走官方 release 更快也更完整；安装包目标（nsis / portable / AppImage /
+  # dmg）额外需要 electron-builder-binaries 里的工具，镜像缺失时会直接让 Package 失败。
+  # 注意：electron-builder 的优先级是 NPM_CONFIG_* > ELECTRON_BUILDER_BINARIES_MIRROR，
+  # 而 npm 会把 .npmrc 注入成 npm_config_*，所以这里必须用大写变量覆盖。
+  NPM_CONFIG_ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+  NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+  ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+  ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
 
 jobs:
   # 先解析版本号并生成发布描述，后面三个平台都用同一份结果，保证包名与描述一致
@@ -101,6 +110,8 @@ jobs:
     name: package (${{ matrix.name }})
     needs: prepare
     runs-on: ${{ matrix.os }}
+    # macOS 打包（dmg + 双架构）较慢，给个上界总比默认 360 分钟强
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -110,8 +121,11 @@ jobs:
             args: --win --x64
             artifact: |
               release/*.exe
+          # macOS 用 Intel 镜像：macos-latest 已是 arm64，机池容量不足会让 job 拿不到 runner
+          # （"The job was not acquired by Runner of type hosted..."）。Intel 镜像上 cross-build
+          # arm64 没问题：koffi 是 N-API 预编译且 macOS 不加载，npmRebuild 已关闭。
           - name: macos-x64-and-arm64
-            os: macos-latest
+            os: macos-15-intel
             args: --mac --x64 --arm64
             artifact: |
               release/*.dmg

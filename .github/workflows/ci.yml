@@ -14,13 +14,25 @@ jobs:
   verify:
     name: verify (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # 托管队列上限约 15 分钟，真正卡住的是步骤；给一个上界避免占满默认 360 分钟
+    timeout-minutes: 45
     env:
       # 单元测试与未打包构建不需要证书；避免 CI 在钥匙串里搜索签名身份
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # 与 release.yml 一致：托管 runner 走官方源，别用 .npmrc 里的国内镜像
+      NPM_CONFIG_ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+      NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # 矩阵内容按事件类型切换：PR 上不含 macOS。
+        # 原因：2026-10 起 GitHub 托管 macOS arm64 机池长期容量不足，macos-latest（= macOS 15 arm64）
+        # 的 job 会排队 ~15 分钟后被取消，一个 step 都不跑：
+        #   "The job was not acquired by Runner of type hosted even after multiple attempts"
+        # 这不是配置或代码问题，但会让每个 PR 恒红。macOS 仍在 push 到 master / 手动触发时校验。
+        # 注意：matrix 上下文在 jobs.<id>.if 里不可用（会让整个工作流失效），所以这里直接决定矩阵内容，
+        # 而不是给 job 加 if。想恢复「PR 也跑 macOS」，把三元的条件两边的列表改成一样即可。
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["windows-latest", "ubuntu-latest"]') || fromJSON('["windows-latest", "macos-15-intel", "ubuntu-latest"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

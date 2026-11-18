@@ -24,6 +24,7 @@ jobs:
     name: detect version commit
     if: vars.AUTO_RELEASE != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.detect.outputs.version }}
       release: ${{ steps.gate.outputs.release }}
