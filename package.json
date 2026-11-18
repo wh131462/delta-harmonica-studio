@@ -1,6 +1,6 @@
 {
   "name": "delta-harmonica-studio",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "description": "三角洲行动·守夜人口琴 自动演奏工作台：简谱编辑 / MIDI·音频分析转谱（主旋律优先）/ 跟谱练习模式 / 悬浮控制窗 / 可配置全局热键 / 真实采样双音色试听 / 音乐方案管理 / 高精度键鼠注入",
   "main": "./out/main/index.js",
