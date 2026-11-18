@@ -76,9 +76,20 @@ node scripts/screenshot-site.cjs --only home-workflow --port 4181 --out artifact
 7. 把产物里所有 HTML 的 `{{SITE_VERSION}}` 占位符替换为版本号（没有占位符也不报错），并写入空文件 `dist-site/.nojekyll`；
 8. 校验 `index.html`、`downloads.html`、`release.json`、`.nojekyll` 都存在，打印版本 / 数据来源 / 资产数量 / 输出目录摘要；任何未捕获异常都会打印中文错误并以退出码 1 结束。
 
-## release.json 从哪来
+## 版本数据从哪来
 
-下载页的 JS 通过 `fetch('./release.json')` 读取这份数据。构建脚本优先向 GitHub API 取真实 Release：
+页面里的版本号**不在 HTML 里硬编码**，而是由 `site/scripts/site.js` 在运行时按下面的优先级获取：
+
+1. **浏览器直接请求 GitHub API** `https://api.github.com/repos/<repo>/releases/latest`（6 秒超时）；
+   成功后把 Release（tag、发布日期、安装包列表）写入 `sessionStorage`，缓存 15 分钟，避免匿名 API 限流。
+   这是「不重新部署也能看到最新版本」的主路径。
+2. 请求失败（断开网络、403/429 限流、仓库无 Release）时，回退到构建产物里的 `./release.json` 快照。
+   该快照由 CI 构建时的 `scripts/build-site.mjs` 生成（构建环境带 `GITHUB_TOKEN`，不受浏览器限流影响）；
+   只有快照的 `source` 为 `api` 或确实包含下载资产时才被视为有效 Release。
+3. 两者都没有时，页面显示「尚未发布」，下载卡显示「首次发布后在此直接下载」并链接 GitHub Releases；
+   **不会把 `package.json` 里的开发版本号冒充成最新版本**。
+
+`dist-site/release.json` 的构建流程如下（`scripts/build-site.mjs` 优先向 GitHub API 取真实 Release）：
 
 - `GITHUB_REF` 为 `refs/tags/<tag>` 时请求 `https://api.github.com/repos/<repo>/releases/tags/<tag>`；
 - 否则（push / workflow_dispatch / 线上默认分支）请求 `/releases/latest`；
@@ -111,12 +122,13 @@ node scripts/screenshot-site.cjs --only home-workflow --port 4181 --out artifact
 }
 ```
 
-**降级行为**（`source: "fallback"`）：
+**构建快照的降级行为**（`source: "fallback"`）：
 
-- 版本号取 `package.json` 的 `version`，`tag` 取 `v<version>`；
+- 版本号取 `package.json` 的 `version`，`tag` 取 `v<version>`，仅作为构建元数据；
 - 若仓库里提交的 `site/release.json` 版本与 `package.json` 一致，沿用其中的 `assets`、`publishedAt`、`htmlUrl`
   （相当于上一次发布留下的兜底数据）；版本不一致时只保留版本号，下载列表留空；
-- 页面应能处理 `assets: []`（显示「暂无下载 / 去 GitHub Releases 查看」之类的兜底文案）。
+- 页面会忽略没有资产的 fallback 快照，显示「尚未发布」，避免把未发布版本当作最新版；
+- 页面必须能处理 `assets: []`（显示「暂无下载 / 去 GitHub Releases 查看」之类的兜底文案）。
 
 > 发版时请让 tag（如 `v0.3.0`）与 `package.json` 的 `version` 一致，这样版本号注入、release.json 与下载页展示才是同一个版本。
 
@@ -136,11 +148,15 @@ Pages 由 `pages.yml` 负责，仓库管理员需要手动开启一次：
 
 ## 发版后自动刷新下载页
 
-`pages.yml` 同时监听 `release: published`：
+两条路径都会让下载页更新：
 
-1. `release.yml` 发布 GitHub Release（推 tag 或 workflow_dispatch）后触发 Pages 工作流；
-2. 构建脚本拿到 `GITHUB_REF=refs/tags/v0.3.0`，按该 tag 请求 `/releases/tags/v0.3.0`；
-3. 下载页的版本号与安装包列表自动更新，无需手动改 `site/release.json`。
+- **运行时**：页面每次加载会向 GitHub API 取 `/releases/latest`（按 IP 限流，sessionStorage 缓存 15 分钟），
+  发版后访客刷新页面即可看到新版本与安装包，无需等站点重新部署；
+- **构建时**：`pages.yml` 监听 `release: published`，发布后重新构建并部署一次，
+  用带 token 的 API 结果刷新 `dist-site/release.json` 快照，给匿名 API 被限流的访客兜底：
+  1. `release.yml` 发布 GitHub Release（推 tag 或 workflow_dispatch）后触发 Pages 工作流；
+  2. 构建脚本拿到 `GITHUB_REF=refs/tags/v0.3.0`，按该 tag 请求 `/releases/tags/v0.3.0`；
+  3. 下载页的版本号与安装包列表自动更新，无需手动改 `site/release.json`。
 
 注意：
 
