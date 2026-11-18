@@ -4,11 +4,19 @@ copyright: 非官方工具，仅供个人练习与娱乐使用
 
 directories:
   output: release
-  buildResources: build
+  # 品牌资源（应用图标等）放在 assets/，与随包分发的运行时资源 resources/ 区分开；
+  # electron-builder 在这里查找 icon.png 并自动转换成 Windows .ico / macOS .icns。
+  buildResources: assets
+
+# macOS 无正式证书时补 ad-hoc 签名（Apple Silicon 必需）；有证书时脚本自动跳过
+afterPack: scripts/after-pack.cjs
 
 extraResources:
-  - from: build/icon.png
+  - from: assets/icon.png
     to: icon.png
+  # 真实音源采样放在 asar 外，主进程按白名单读取；升级/替换采样无需重打包 app.asar
+  - from: resources/audio-samples
+    to: audio-samples
 
 files:
   - out/**/*
@@ -16,6 +24,9 @@ files:
   - '!**/*.map'
 
 asar: true
+# koffi 使用 N-API 预编译产物，跨 Electron 版本无需重编译；
+# 关闭 rebuild 后可以在同一台 macOS runner 上同时产出 x64 / arm64（macOS 不加载 koffi）。
+npmRebuild: false
 asarUnpack:
   - node_modules/koffi/**/*
   - node_modules/@koromix/**/*
@@ -48,3 +59,34 @@ nsis:
 
 portable:
   artifactName: delta-harmonica-${version}-portable.${ext}
+
+# macOS：编辑 / 导入 / 练习 / 试听 / 宏导出可用，游戏注入不可用（见 docs/PLATFORM_SUPPORT.md）。
+# 未配置签名证书时产出未签名包，首次打开需在「系统设置 → 隐私与安全性」中允许，或右键「打开」。
+mac:
+  category: public.app-category.music
+  darkModeSupport: true
+  target:
+    - dmg
+    - zip
+  executableName: DeltaHarmonicaStudio
+  artifactName: delta-harmonica-${version}-mac-${arch}.${ext}
+
+dmg:
+  artifactName: delta-harmonica-${version}-mac-${arch}.${ext}
+
+# Linux：AppImage（免安装）+ deb，编辑 / 导入 / 练习 / 试听 / 宏导出可用，游戏注入不可用。
+linux:
+  category: AudioVideo
+  synopsis: 三角洲行动「守夜人口琴」自动演奏与练习工作台
+  description: 简谱编辑、MIDI / 音频转谱、跟谱练习、双音色试听、鼠标宏导出与方案管理；游戏注入仅在 Windows 版可用。
+  maintainer: Delta Harmonica Studio <delta-harmonica@users.noreply.github.com>
+  executableName: DeltaHarmonicaStudio
+  target:
+    - AppImage
+    - deb
+  artifactName: delta-harmonica-${version}-linux-${arch}.${ext}
+
+deb:
+  # Debian 包名必须是 ASCII 小写；产品显示名仍由 productName / .desktop 决定
+  packageName: delta-harmonica-studio
+
