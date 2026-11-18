@@ -10,8 +10,12 @@
   const REPO = 'wh131462/delta-harmonica-studio';
   const REPO_URL = `https://github.com/${REPO}`;
   const API_URL = `https://api.github.com/repos/${REPO}`;
-  const STAR_CACHE_KEY = 'dhs:stars:v1';
-  const STAR_CACHE_TTL = 30 * 60 * 1000;
+  const LATEST_RELEASE_API = `${API_URL}/releases/latest`;
+  const RELEASE_CACHE_KEY = 'dhs:release:v1';
+  const RELEASE_CACHE_TTL = 15 * 60 * 1000;
+  const RELEASE_API_TIMEOUT = 6000;
+  const RELEASE_ASSET_PATTERN = /^delta-harmonica-.*\.(exe|dmg|zip|AppImage|deb)$/i;
+  const CHECKSUM_ASSET_NAME = 'SHA256SUMS.txt';
   const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -42,13 +46,6 @@
       month: 'long',
       day: 'numeric',
     }).format(date);
-  }
-
-  function formatStars(count) {
-    if (typeof count !== 'number' || !Number.isFinite(count)) return '';
-    if (count < 1000) return String(count);
-    const value = count / 1000;
-    return `${value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, '')}k`;
   }
 
   function detectPlatform() {
@@ -355,75 +352,7 @@
     });
   }
 
-  /* ---------- Star 数量 ---------- */
-
-  async function fetchStarCount() {
-    try {
-      const response = await fetch(API_URL, {
-        headers: { Accept: 'application/vnd.github+json' },
-        cache: 'no-store',
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      if (typeof data.stargazers_count !== 'number') throw new Error('bad payload');
-      try {
-        sessionStorage.setItem(
-          STAR_CACHE_KEY,
-          JSON.stringify({ count: data.stargazers_count, at: Date.now() }),
-        );
-      } catch {
-        /* 隐私模式下忽略 */
-      }
-      return data.stargazers_count;
-    } catch {
-      return null;
-    }
-  }
-
-  function applyStarCount(count) {
-    if (typeof count !== 'number') return;
-    DHS.starCount = count;
-    $$('[data-star-count]').forEach((el) => {
-      el.textContent = formatStars(count);
-      el.setAttribute('title', `${count} 个 Star`);
-    });
-  }
-
-  function initStarCount() {
-    const slots = $$('[data-star-count]');
-    if (!slots.length) return;
-
-    let cached = null;
-    try {
-      const raw = sessionStorage.getItem(STAR_CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && Date.now() - parsed.at < STAR_CACHE_TTL) cached = parsed.count;
-      }
-    } catch {
-      /* 忽略 */
-    }
-
-    if (typeof cached === 'number') {
-      applyStarCount(cached);
-    } else {
-      slots.forEach((el) => {
-        el.textContent = '—';
-      });
-    }
-
-    fetchStarCount().then((count) => {
-      if (typeof count === 'number') {
-        applyStarCount(count);
-      } else if (typeof cached !== 'number') {
-        slots.forEach((el) => {
-          el.textContent = '';
-        });
-      }
-    });
-  }
-
-  /* ---------- Release 数据 ---------- */
+  /* ---------- Release 数据：运行时取最新版，构建快照做兜底 ---------- */
 
   function fallbackRelease() {
     return {
@@ -438,30 +367,125 @@
     };
   }
 
+  function normalizeAssets(assets) {
+    if (!Array.isArray(assets)) return [];
+    return assets
+      .filter((asset) => {
+        if (!asset || typeof asset.name !== 'string' || !asset.browser_download_url) return false;
+        return asset.name === CHECKSUM_ASSET_NAME || RELEASE_ASSET_PATTERN.test(asset.name);
+      })
+      .map((asset) => ({
+        name: asset.name,
+        size: Number.isFinite(Number(asset.size)) ? Number(asset.size) : 0,
+        browser_download_url: asset.browser_download_url,
+        content_type: typeof asset.content_type === 'string' ? asset.content_type : '',
+      }));
+  }
+
+  function normalizeRelease(raw, source) {
+    if (!raw) return null;
+    const rawVersion = raw.version || raw.tag_name || raw.tag || '';
+    const version = String(rawVersion).trim().replace(/^[vV](?=\d)/, '');
+    if (!version) return null;
+    const tag = String(raw.tag || raw.tag_name || `v${version}`).trim();
+    const tagUrl = `${REPO_URL}/releases/tag/${encodeURIComponent(tag)}`;
+    const htmlUrl =
+      typeof raw.htmlUrl === 'string' && raw.htmlUrl.startsWith('http')
+        ? raw.htmlUrl
+        : typeof raw.html_url === 'string' && raw.html_url.startsWith('http')
+          ? raw.html_url
+          : tagUrl;
+    return {
+      repo: raw.repo || REPO,
+      version,
+      tag,
+      publishedAt: raw.publishedAt || raw.published_at || null,
+      htmlUrl,
+      notesUrl: raw.notesUrl || htmlUrl,
+      source: source || raw.source || 'static',
+      assets: normalizeAssets(raw.assets),
+    };
+  }
+
+  function readReleaseCache() {
+    try {
+      const raw = sessionStorage.getItem(RELEASE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.at || Date.now() - parsed.at > RELEASE_CACHE_TTL) {
+        sessionStorage.removeItem(RELEASE_CACHE_KEY);
+        return null;
+      }
+      return parsed.release || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeReleaseCache(release) {
+    try {
+      sessionStorage.setItem(
+        RELEASE_CACHE_KEY,
+        JSON.stringify({ release, at: Date.now() }),
+      );
+    } catch {
+      /* 隐私模式下忽略 */
+    }
+  }
+
+  async function fetchLatestRelease() {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), RELEASE_API_TIMEOUT);
+    try {
+      const response = await fetch(LATEST_RELEASE_API, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+        },
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return normalizeRelease(data, 'api');
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function applyReleaseUI(release) {
-    const version = release && release.version ? String(release.version).replace(/^v/i, '') : '';
+    const version = release && release.version ? String(release.version) : '';
     $$('[data-release-version]').forEach((el) => {
-      el.textContent = version ? `v${version}` : '开发版';
+      el.textContent = version ? `v${version}` : '尚未发布';
+      el.setAttribute(
+        'title',
+        version ? '来自 GitHub Releases 的最新版本' : '仓库还没有正式 Release',
+      );
     });
     $$('[data-release-date]').forEach((el) => {
-      el.textContent = release.publishedAt ? formatDate(release.publishedAt) : '尚未发布';
+      el.textContent = release && release.publishedAt ? formatDate(release.publishedAt) : '尚未发布';
     });
     $$('[data-release-date-iso]').forEach((el) => {
-      if (release.publishedAt) el.setAttribute('datetime', release.publishedAt);
+      if (release && release.publishedAt) el.setAttribute('datetime', release.publishedAt);
     });
 
-    const groups = groupAssets(release.assets);
+    const groups = groupAssets(release ? release.assets : []);
     const installer =
       groups.windows.find((item) => item.kind === 'installer') || groups.windows[0] || null;
-    const primaryUrl = installer ? installer.asset.browser_download_url : release.htmlUrl;
+    const primaryUrl = installer ? installer.asset.browser_download_url : (release && release.htmlUrl) || `${REPO_URL}/releases`;
     $$('[data-download-primary]').forEach((el) => {
       el.setAttribute('href', primaryUrl);
     });
     $$('[data-release-url]').forEach((el) => {
-      el.setAttribute('href', release.htmlUrl || `${REPO_URL}/releases`);
+      el.setAttribute('href', (release && release.htmlUrl) || `${REPO_URL}/releases`);
     });
     $$('[data-release-notes]').forEach((el) => {
-      el.setAttribute('href', release.notesUrl || release.htmlUrl || `${REPO_URL}/releases`);
+      el.setAttribute(
+        'href',
+        (release && (release.notesUrl || release.htmlUrl)) || `${REPO_URL}/releases`,
+      );
     });
   }
 
@@ -474,28 +498,31 @@
       return release;
     };
 
+    // 1) 运行时直接取 GitHub 最新 Release：页面无需重新部署即可显示新版本
+    const cached = readReleaseCache();
+    if (cached) return emit(cached);
+
+    const latest = await fetchLatestRelease();
+    if (latest) {
+      writeReleaseCache(latest);
+      return emit(latest);
+    }
+
+    // 2) 回退到构建时快照（CI 构建时带 token 查询，规避浏览器端 API 限流）
     try {
       const response = await fetch('./release.json', { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      const release = {
-        repo: data.repo || REPO,
-        version: data.version ? String(data.version) : '',
-        tag: data.tag ? String(data.tag) : '',
-        publishedAt: data.publishedAt || null,
-        htmlUrl: data.htmlUrl || `${REPO_URL}/releases`,
-        notesUrl: data.notesUrl || data.htmlUrl || `${REPO_URL}/releases`,
-        source: data.source || 'static',
-        assets: Array.isArray(data.assets)
-          ? data.assets.filter(
-              (asset) => asset && asset.name && asset.browser_download_url,
-            )
-          : [],
-      };
-      return emit(release);
+      const snapshot = normalizeRelease(data, data.source || 'snapshot');
+      const trusted =
+        snapshot && (data.source === 'api' || snapshot.assets.length > 0);
+      if (trusted) return emit(snapshot);
     } catch {
-      return emit(fallbackRelease());
+      /* 忽略，走最终兜底 */
     }
+
+    // 3) 没有 Release / API 与快照都不可用：明确「尚未发布」，版本不硬编码
+    return emit(fallbackRelease());
   }
 
   function onRelease(callback) {
@@ -525,14 +552,12 @@
     releasesUrl: `${REPO_URL}/releases`,
     reducedMotion: REDUCED.matches,
     release: null,
-    starCount: null,
     detectPlatform,
     groupAssets,
     classifyAsset,
     formatBytes,
     formatDate,
     fetchRelease,
-    fetchStarCount,
     onRelease,
   };
   window.DHS = DHS;
@@ -546,7 +571,6 @@
     initCurrentPageNav();
     initDialogs();
     initYear();
-    initStarCount();
     fetchRelease();
   }
 

@@ -68,11 +68,6 @@
         <a class="nav__link" href="./downloads.html">下载</a>
       </nav>
       <div class="nav__actions">
-        <a class="btn btn--secondary btn--sm star-button" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">
-          <svg class="icon-star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.07.78 2.16v3.2c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-          <span>Star</span>
-          <span class="star-button__count" data-star-count>—</span>
-        </a>
         <a class="btn btn--primary btn--sm header-download" href="./downloads.html">下载</a>
         <button class="menu-button" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-nav" aria-label="打开菜单">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -85,7 +80,6 @@
       <a class="mobile-nav__link" href="./#practice">练习</a>
       <a class="mobile-nav__link" href="./downloads.html">下载</a>
       <div class="mobile-nav__actions">
-        <a class="btn btn--secondary" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">Star 项目</a>
         <a class="btn btn--primary" href="./downloads.html">下载安装包</a>
       </div>
     </nav>
@@ -173,7 +167,7 @@
     </section>
 
     <!-- 演奏流程 -->
-    <section class="section flow" id="workflow" aria-labelledby="workflow-title">
+    <section class="section flow" id="workflow" data-chapter="演奏流程" aria-labelledby="workflow-title">
       <div class="container">
         <div class="section-head flow__head" data-reveal>
           <p class="section-label">演奏流程</p>
@@ -290,7 +284,7 @@
     </section>
 
     <!-- 能力 -->
-    <section class="section" id="features" aria-labelledby="features-title">
+    <section class="section" id="features" data-chapter="核心能力" aria-labelledby="features-title">
       <div class="container">
         <div class="section-head" data-reveal>
           <p class="section-label">核心能力</p>
@@ -375,7 +369,7 @@
     </section>
 
     <!-- 交互练习 -->
-    <section class="section practice" id="practice" aria-labelledby="practice-title">
+    <section class="section practice" id="practice" data-chapter="亲手试一下" aria-labelledby="practice-title">
       <div class="container practice__grid">
         <div class="practice__copy" data-reveal>
           <p class="section-label">亲手试一下</p>
@@ -443,10 +437,10 @@
     </section>
 
     <!-- 游戏内 -->
-    <section class="section ingame" id="ingame" aria-labelledby="ingame-title">
+    <section class="section ingame" id="ingame" data-chapter="游戏内" aria-labelledby="ingame-title">
       <div class="container ingame__grid">
         <div class="ingame__visual" data-reveal>
-          <div class="ingame__screen">
+          <div class="ingame__screen" data-parallax-scroll="0.12">
             <div class="ingame__hud" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span>
             </div>
@@ -478,7 +472,7 @@
     </section>
 
     <!-- 页面巡览 -->
-    <section class="section gallery" id="gallery" aria-labelledby="gallery-title">
+    <section class="section gallery" id="gallery" data-chapter="页面巡览" aria-labelledby="gallery-title">
       <div class="container">
         <div class="gallery__head" data-reveal>
           <div class="section-head">
@@ -488,65 +482,109 @@
           </div>
         </div>
 
-        <div class="gallery__tabs" role="tablist" aria-label="界面预览">
-          <button class="gallery__tab is-active" type="button" role="tab" id="gallery-tab-0" aria-selected="true" aria-controls="gallery-panel-0" data-gallery-tab="0">演奏台</button>
-          <button class="gallery__tab" type="button" role="tab" id="gallery-tab-1" aria-selected="false" aria-controls="gallery-panel-1" tabindex="-1" data-gallery-tab="1">编辑器</button>
-          <button class="gallery__tab" type="button" role="tab" id="gallery-tab-2" aria-selected="false" aria-controls="gallery-panel-2" tabindex="-1" data-gallery-tab="2">智能导入</button>
-          <button class="gallery__tab" type="button" role="tab" id="gallery-tab-3" aria-selected="false" aria-controls="gallery-panel-3" tabindex="-1" data-gallery-tab="3">跟谱练习</button>
-          <button class="gallery__tab" type="button" role="tab" id="gallery-tab-4" aria-selected="false" aria-controls="gallery-panel-4" tabindex="-1" data-gallery-tab="4">方案库</button>
-          <button class="gallery__tab" type="button" role="tab" id="gallery-tab-5" aria-selected="false" aria-controls="gallery-panel-5" tabindex="-1" data-gallery-tab="5">设置</button>
-        </div>
+        <div class="gallery__grid">
+          <figure class="gallery__shot" data-reveal>
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-play.webp" data-shot-alt="演奏台完整界面" data-shot-caption="演奏台 · 选曲、确认输入、开始演奏" aria-label="放大查看演奏台界面">
+                <img src="./assets/shots/ui-play.webp" width="1600" height="1000" alt="演奏台完整界面：左侧曲谱概览，右侧演奏设置与开始演奏" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">演奏台</span>
+              <span class="gallery__shot-desc">选曲、确认输入、开始演奏</span>
+            </figcaption>
+          </figure>
 
-        <div class="gallery__stage">
-          <div class="gallery__panel is-active" role="tabpanel" id="gallery-panel-0" aria-labelledby="gallery-tab-0" data-gallery-panel="0">
-            <img src="./assets/shots/ui-play.webp" width="1600" height="1000" alt="演奏台完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-play.webp" data-shot-alt="演奏台完整界面" data-shot-caption="演奏台 · 选曲、确认安全项、开始演奏">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
-          <div class="gallery__panel" role="tabpanel" id="gallery-panel-1" aria-labelledby="gallery-tab-1" data-gallery-panel="1" hidden>
-            <img src="./assets/shots/ui-editor.webp" width="1600" height="1000" alt="简谱编辑器完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-editor.webp" data-shot-alt="简谱编辑器完整界面" data-shot-caption="简谱编辑器 · 逐音编辑与实时录入">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
-          <div class="gallery__panel" role="tabpanel" id="gallery-panel-2" aria-labelledby="gallery-tab-2" data-gallery-panel="2" hidden>
-            <img src="./assets/shots/ui-import.webp" width="1600" height="1000" alt="智能导入完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-import.webp" data-shot-alt="智能导入完整界面" data-shot-caption="智能导入 · MIDI 与音频转谱参数">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
-          <div class="gallery__panel" role="tabpanel" id="gallery-panel-3" aria-labelledby="gallery-tab-3" data-gallery-panel="3" hidden>
-            <img src="./assets/shots/ui-practice-fall.webp" width="1600" height="1000" alt="跟谱练习完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-practice-fall.webp" data-shot-alt="跟谱练习完整界面" data-shot-caption="跟谱练习 · 下落式谱面与实时判定">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
-          <div class="gallery__panel" role="tabpanel" id="gallery-panel-4" aria-labelledby="gallery-tab-4" data-gallery-panel="4" hidden>
-            <img src="./assets/shots/ui-library.webp" width="1600" height="1000" alt="音乐方案库完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-library.webp" data-shot-alt="音乐方案库完整界面" data-shot-caption="音乐方案库 · 收藏、搜索与批量管理">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
-          <div class="gallery__panel" role="tabpanel" id="gallery-panel-5" aria-labelledby="gallery-tab-5" data-gallery-panel="5" hidden>
-            <img src="./assets/shots/ui-settings.webp" width="1600" height="1000" alt="设置与校准完整界面" loading="lazy" />
-            <button class="gallery__zoom" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-settings.webp" data-shot-alt="设置与校准完整界面" data-shot-caption="设置与校准 · 快捷键、时序与音源">
-              <span>放大查看</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
-            </button>
-          </div>
+          <figure class="gallery__shot" data-reveal="80">
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-editor.webp" data-shot-alt="简谱编辑器完整界面" data-shot-caption="简谱编辑器 · 逐音编辑与实时录入" aria-label="放大查看简谱编辑器界面">
+                <img src="./assets/shots/ui-editor.webp" width="1600" height="1000" alt="简谱编辑器完整界面：逐音编辑音级、八度、升降与时值" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">简谱编辑器</span>
+              <span class="gallery__shot-desc">逐音编辑与实时录入</span>
+            </figcaption>
+          </figure>
+
+          <figure class="gallery__shot" data-reveal>
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-import.webp" data-shot-alt="智能导入完整界面" data-shot-caption="智能导入 · MIDI 与音频转谱参数" aria-label="放大查看智能导入界面">
+                <img src="./assets/shots/ui-import.webp" width="1600" height="1000" alt="智能导入完整界面：选择 MIDI 或音频文件，设置主旋律提取参数" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">智能导入</span>
+              <span class="gallery__shot-desc">MIDI 与音频转谱</span>
+            </figcaption>
+          </figure>
+
+          <figure class="gallery__shot" data-reveal="80">
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-practice-fall.webp" data-shot-alt="跟谱练习完整界面" data-shot-caption="跟谱练习 · 下落式谱面与实时判定" aria-label="放大查看跟谱练习界面">
+                <img src="./assets/shots/ui-practice-fall.webp" width="1600" height="1000" alt="跟谱练习完整界面：下落式谱面、准确率、连击与判定线" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">跟谱练习</span>
+              <span class="gallery__shot-desc">下落式谱面与实时判定</span>
+            </figcaption>
+          </figure>
+
+          <figure class="gallery__shot" data-reveal>
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-library.webp" data-shot-alt="音乐方案库完整界面" data-shot-caption="音乐方案库 · 收藏、搜索与批量管理" aria-label="放大查看音乐方案库界面">
+                <img src="./assets/shots/ui-library.webp" width="1600" height="1000" alt="音乐方案库完整界面：曲谱卡片、收藏、搜索与筛选" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">音乐方案库</span>
+              <span class="gallery__shot-desc">收藏、搜索与批量管理</span>
+            </figcaption>
+          </figure>
+
+          <figure class="gallery__shot" data-reveal="80">
+            <div class="gallery__shot-parallax">
+              <button class="gallery__shot-button" type="button" data-dialog-open="shot-dialog" data-shot-group="gallery" data-shot-src="./assets/shots/ui-settings.webp" data-shot-alt="设置与校准完整界面" data-shot-caption="设置与校准 · 快捷键、时序与音源" aria-label="放大查看设置与校准界面">
+                <img src="./assets/shots/ui-settings.webp" width="1600" height="1000" alt="设置与校准完整界面：快捷键、演奏时序与音源设置" loading="lazy" />
+                <span class="gallery__shot-zoom" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6 6M4 20l6-6"/></svg>
+                  放大
+                </span>
+              </button>
+            </div>
+            <figcaption class="gallery__shot-caption">
+              <span class="gallery__shot-name">设置与校准</span>
+              <span class="gallery__shot-desc">快捷键、时序与音源</span>
+            </figcaption>
+          </figure>
         </div>
-        <p class="gallery__hint muted">点击大图或「放大查看」进入灯箱，支持 ← → 切换。</p>
+        <p class="gallery__hint muted">点击任意截图放大查看，支持 ← → 切换。</p>
       </div>
     </section>
 
-    <!-- 下载与 Star -->
-    <section class="section cta" id="download" aria-labelledby="cta-title">
+    <!-- 下载 -->
+    <section class="section cta" id="download" data-chapter="下一步" aria-labelledby="cta-title">
       <div class="container">
         <div class="cta__panel" data-reveal>
           <div class="cta__copy">
@@ -554,22 +592,25 @@
             <h2 class="section-title" id="cta-title">装好它，回游戏按 F9</h2>
             <p class="section-lead">Windows 10/11 完整功能；macOS 12+ 与 Linux 保留编辑、导入、练习、试听与宏导出。开源、离线、不修改游戏文件。</p>
             <div class="cta__actions">
-              <a class="btn btn--accent btn--lg" href="./downloads.html">前往下载</a>
-              <a class="btn btn--secondary btn--lg" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer" data-release-url>GitHub Releases</a>
+              <a class="btn btn--accent btn--lg" href="./downloads.html">下载最新版本</a>
+              <a class="btn btn--secondary btn--lg" href="https://github.com/wh131462/delta-harmonica-studio/releases" target="_blank" rel="noreferrer" data-release-url>全部发布记录</a>
             </div>
-            <p class="cta__meta muted"><span class="num" data-release-version>v0.3.0</span> · MIT 许可 · 不收集任何数据</p>
-          </div>
-          <div class="cta__star">
-            <span class="cta__star-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.45 6.19 20.5l1.11-6.47L2.6 9.45l6.5-.95L12 2.6Z"/></svg>
-            </span>
-            <h3 class="cta__star-title">如果它帮你省下了扒谱时间</h3>
-            <p class="cta__star-text">Star 不会解锁任何功能，但能让更多人找到它，也会让我有理由继续更新。</p>
-            <a class="btn btn--primary" href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-2.15c-3.2.7-3.87-1.36-3.87-1.36-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.07.78 2.16v3.2c0 .3.21.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
-              在 GitHub 点一颗 Star
-              <span class="star-button__count" data-star-count>—</span>
-            </a>
+            <div class="cta__platforms" aria-label="支持的平台">
+              <span class="cta__platform">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 11.2 4.4v7.2H3V5.5Zm9.3-1.3L21 3v8.6h-8.7V4.2ZM3 12.8h8.2v7.2L3 18.9v-6.1Zm9.3 0H21V21l-8.7-1.2v-7Z"/></svg>
+                Windows 10 / 11
+              </span>
+              <span class="cta__platform">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.9 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.9-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 6.9 1.1 9.2.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7c1.2 0 2-1.1 2.7-2.2.9-1.3 1.2-2.5 1.2-2.6-.1 0-2-.8-2-3.5Z"/><path d="M14.5 6.1c.6-.8 1.1-1.9 1-3-.9.1-2 .6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3Z"/></svg>
+                macOS 12+
+              </span>
+              <span class="cta__platform">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2c-2 0-3.2 1.6-3.2 3.6 0 1 .3 1.6.3 2.4 0 .8-.6 1.5-1.4 2.8-.9 1.5-2 3.3-2.1 4.9-.1 1 .2 1.8.9 2.1.3.1.7.1.9-.1v-.9c.1-1.2.9-2.4 1.6-3.3-.3 1.7-.6 3.5-.2 5 .4 1.7 1.7 2.6 3.3 2.6s2.9-.9 3.3-2.6c.4-1.5.1-3.3-.2-5 .7.9 1.5 2.1 1.6 3.3v.9c.2.2.6.2.9.1.7-.3 1-1.1.9-2.1-.1-1.6-1.2-3.4-2.1-4.9-.8-1.3-1.4-2-1.4-2.8 0-.8.3-1.4.3-2.4 0-2-1.2-3.6-3.2-3.6Z"/><circle cx="10.4" cy="7.1" r=".8" fill="var(--surface-2)"/><circle cx="13.6" cy="7.1" r=".8" fill="var(--surface-2)"/><path fill="var(--accent)" d="M10.9 8.5h2.2L12 10.2l-1.1-1.7Z"/></svg>
+                Linux x64
+              </span>
+            </div>
+            <p class="cta__meta muted"><span class="num" data-release-version>—</span> · MIT 许可 · 不收集任何数据</p>
+            <p class="cta__star-link muted"><a href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">如果它帮到了你，欢迎在 GitHub 点一颗 Star。</a></p>
           </div>
         </div>
       </div>
@@ -645,6 +686,7 @@
       <div class="footer-note">
         <p>非官方工具，与腾讯及天美工作室群无关。《三角洲行动》及相关素材版权归原权利人所有。游戏官方已将第三方软件、脚本、鼠标宏等自动操作列为违规行为，最高封禁 10 年；Windows 版通过 Windows 输入 API 模拟键鼠，不包含任何反检测机制，使用风险自负。</p>
         <p>试听采样：口琴 VCSL Hohner Special 20（CC0）；钢琴 Alexander Holm · Salamander Grand Piano（CC BY 3.0）。代码以 MIT 许可发布。</p>
+        <p class="footer-star">如果这个项目帮到了你，欢迎在 <a href="https://github.com/wh131462/delta-harmonica-studio" target="_blank" rel="noreferrer">GitHub 点一颗 Star</a>。</p>
       </div>
       <div class="footer-bottom">
         <span>© <span data-year>2026</span> Delta Harmonica Studio</span>

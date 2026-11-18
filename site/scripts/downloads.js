@@ -291,7 +291,7 @@
       ),
     );
     const link = document.createElement('a');
-    link.className = 'btn btn--secondary btn--block';
+    link.className = 'btn btn--primary btn--block';
     link.href = REPO_RELEASES;
     link.target = '_blank';
     link.rel = 'noreferrer';

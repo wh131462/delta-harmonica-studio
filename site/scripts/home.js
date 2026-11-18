@@ -96,41 +96,103 @@
     update();
   }
 
-  /* ==================== 页面巡览标签 ==================== */
+  /* ==================== 右侧章节进度 ==================== */
 
-  function initGallery() {
-    const tabs = $$('[data-gallery-tab]');
-    const panels = $$('[data-gallery-panel]');
-    if (!tabs.length || !panels.length) return;
+  function initChapterRail() {
+    const sections = $$('main > section[data-chapter]');
+    if (!sections.length || $('.chapter-rail')) return;
 
-    const activate = (index, moveFocus) => {
-      tabs.forEach((tab, i) => {
-        const on = i === index;
-        tab.classList.toggle('is-active', on);
-        tab.setAttribute('aria-selected', String(on));
-        tab.tabIndex = on ? 0 : -1;
-        if (on && moveFocus) tab.focus();
+    const rail = document.createElement('nav');
+    rail.className = 'chapter-rail';
+    rail.setAttribute('aria-label', '页面章节');
+    const list = document.createElement('ol');
+    list.className = 'chapter-rail__list';
+
+    const links = sections.map((section) => {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.className = 'chapter-rail__link';
+      link.href = `#${section.id}`;
+      link.setAttribute('aria-label', section.dataset.chapter);
+      const dot = document.createElement('span');
+      dot.className = 'chapter-rail__dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'chapter-rail__label';
+      label.setAttribute('aria-hidden', 'true');
+      label.textContent = section.dataset.chapter;
+      link.append(dot, label);
+      item.append(link);
+      list.append(item);
+      return link;
+    });
+
+    rail.append(list);
+    document.body.append(rail);
+
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const probe = window.innerHeight * 0.5;
+      let activeIndex = -1;
+      sections.forEach((section, index) => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= probe && rect.bottom > probe) activeIndex = index;
       });
-      panels.forEach((panel, i) => {
-        const on = i === index;
-        panel.classList.toggle('is-active', on);
-        panel.hidden = !on;
+      links.forEach((link, index) => {
+        const active = index === activeIndex;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      });
+      rail.classList.toggle('is-visible', activeIndex >= 0);
+    };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  }
+
+  /* ==================== 滚动视差 ==================== */
+
+  function initParallax() {
+    if (REDUCED.matches) return;
+
+    // 巡览截图左右交错、以不同速度轻微位移，滚动时像一整面会呼吸的截图墙
+    $$('.gallery__shot-parallax').forEach((el, index) => {
+      if (!el.hasAttribute('data-parallax-scroll')) {
+        el.setAttribute('data-parallax-scroll', index % 2 === 0 ? '0.18' : '0.32');
+      }
+    });
+
+    const items = $$('[data-parallax-scroll]');
+    if (!items.length) return;
+
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const viewport = window.innerHeight || 1;
+      items.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom < -180 || rect.top > viewport + 180) return;
+        const center = rect.top + rect.height / 2;
+        const progress = Math.max(-1.2, Math.min(1.2, (center - viewport / 2) / viewport));
+        const speed = Number(el.getAttribute('data-parallax-scroll')) || 0.15;
+        el.style.setProperty('--parallax-y', `${(progress * speed * -140).toFixed(1)}px`);
       });
     };
-
-    tabs.forEach((tab, i) => {
-      tab.addEventListener('click', () => activate(i, false));
-      tab.addEventListener('keydown', (event) => {
-        let next = null;
-        if (event.key === 'ArrowRight') next = (i + 1) % tabs.length;
-        else if (event.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
-        else if (event.key === 'Home') next = 0;
-        else if (event.key === 'End') next = tabs.length - 1;
-        if (next === null) return;
-        event.preventDefault();
-        activate(next, true);
-      });
-    });
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
   }
 
   /* ==================== 跟谱判定演示 ==================== */
@@ -153,63 +215,118 @@
   const JUDGE_WINDOW = 150;
   const KEY_WINDOW = 220;
 
+  const AUDIO_FILES = {
+    harmonica: [60, 64, 67, 72].map((midi) => ({
+      midi,
+      url: `./assets/audio/harmonica-${midi}.wav`,
+    })),
+    piano: [60, 72].map((midi) => ({ midi, url: `./assets/audio/piano-${midi}.mp3` })),
+  };
+
   const Audio = {
     ctx: null,
     master: null,
     buffers: new Map(),
+    raw: new Map(),
     loading: new Map(),
+    decoding: new Map(),
     timbre: 'harmonica',
+    prefetched: false,
 
-    async ensure() {
+    /** 页面空闲时就抓音频文件，第一次按键只需要 decode，不需要等网络。 */
+    prefetch() {
+      if (this.prefetched) return;
+      this.prefetched = true;
+      Object.entries(AUDIO_FILES).forEach(([timbre, files]) => {
+        files.forEach(({ midi, url }) => {
+          const cacheKey = fileKey(timbre, midi);
+          if (this.raw.has(cacheKey) || this.buffers.has(cacheKey) || this.loading.has(cacheKey)) {
+            return;
+          }
+          const task = fetch(url, { cache: 'force-cache' })
+            .then((response) => {
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              return response.arrayBuffer();
+            })
+            .then((buffer) => {
+              this.raw.set(cacheKey, buffer);
+              if (this.ctx) this.decode(cacheKey);
+            })
+            .catch(() => {})
+            .finally(() => this.loading.delete(cacheKey));
+          this.loading.set(cacheKey, task);
+        });
+      });
+    },
+
+    /** 交互手势里调用：创建/恢复 AudioContext，并开始解码已预抓取的采样。 */
+    ensure() {
       const Ctor = window.AudioContext || window.webkitAudioContext;
-      if (!Ctor) return false;
+      if (!Ctor) return Promise.resolve(false);
       if (!this.ctx) {
-        this.ctx = new Ctor();
+        this.ctx = new Ctor({ latencyHint: 'interactive' });
         this.master = this.ctx.createGain();
         this.master.gain.value = 0.55;
         this.master.connect(this.ctx.destination);
       }
-      if (this.ctx.state === 'suspended') {
-        try {
-          await this.ctx.resume();
-        } catch {
-          return false;
-        }
-      }
-      return this.ctx.state === 'running';
+      this.prefetch();
+      this.raw.forEach((_buffer, key) => {
+        this.decode(key);
+      });
+      const resume =
+        this.ctx.state === 'suspended' ? this.ctx.resume() : Promise.resolve();
+      return resume
+        .then(() => this.ctx.state === 'running')
+        .catch(() => false);
     },
 
-    async load(timbre) {
-      if (!this.ctx) return;
-      const notes = timbre === 'piano' ? [60, 72] : [60, 64, 67, 72];
-      await Promise.all(
-        notes.map((midi) => {
-          const cacheKey = `${timbre}:${midi}`;
-          if (this.buffers.has(cacheKey)) return Promise.resolve();
-          if (this.loading.has(cacheKey)) return this.loading.get(cacheKey);
-          const url =
-            timbre === 'piano'
-              ? `./assets/audio/piano-${midi}.mp3`
-              : `./assets/audio/harmonica-${midi}.wav`;
-          const task = (async () => {
-            try {
-              const response = await fetch(url);
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const data = await response.arrayBuffer();
-              const buffer = await new Promise((resolve, reject) => {
-                this.ctx.decodeAudioData(data, resolve, reject);
-              });
-              this.buffers.set(cacheKey, buffer);
-            } catch {
-              /* 没有声音不影响判定，静默降级 */
-            } finally {
-              this.loading.delete(cacheKey);
-            }
-          })();
-          this.loading.set(cacheKey, task);
-          return task;
+    decode(key) {
+      if (this.buffers.has(key)) return Promise.resolve(this.buffers.get(key));
+      if (this.decoding.has(key)) return this.decoding.get(key);
+      const buffer = this.raw.get(key);
+      if (!buffer || !this.ctx) return Promise.resolve(null);
+      const task = new Promise((resolve) => {
+        this.ctx.decodeAudioData(
+          buffer.slice(0),
+          (decoded) => {
+            this.buffers.set(key, decoded);
+            resolve(decoded);
+          },
+          () => resolve(null),
+        );
+      }).finally(() => this.decoding.delete(key));
+      this.decoding.set(key, task);
+      return task;
+    },
+
+    load(timbre) {
+      if (!this.ctx) {
+        return this.ensure().then((ready) => (ready ? this.load(timbre) : false));
+      }
+      const files = AUDIO_FILES[timbre] || [];
+      return Promise.all(
+        files.map(({ midi, url }) => {
+          const key = `${timbre}:${midi}`;
+          if (this.buffers.has(key)) return Promise.resolve();
+          if (this.decoding.has(key)) return this.decoding.get(key);
+          if (this.raw.has(key)) return this.decode(key);
+          if (!this.loading.has(key)) {
+            const task = fetch(url, { cache: 'force-cache' })
+              .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.arrayBuffer();
+              })
+              .then((buffer) => {
+                this.raw.set(key, buffer);
+                return this.decode(key);
+              })
+              .catch(() => {})
+              .finally(() => this.loading.delete(key));
+            this.loading.set(key, task);
+          }
+          return this.loading.get(key);
         }),
-      );
+      ).catch(() => {});
     },
 
     nearest(timbre, midi) {
@@ -219,12 +336,12 @@
       }, list[0]);
     },
 
-    play(midi) {
-      if (!this.ctx || this.ctx.state !== 'running') return;
+    playNow(midi) {
+      if (!this.ctx || this.ctx.state !== 'running') return false;
       const timbre = this.timbre;
       const base = this.nearest(timbre, midi);
       const buffer = this.buffers.get(`${timbre}:${base}`);
-      if (!buffer) return;
+      if (!buffer) return false;
       try {
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
@@ -233,18 +350,59 @@
         gain.gain.value = 0.9;
         source.connect(gain);
         gain.connect(this.master);
-        source.start();
+        source.start(0);
         source.stop(this.ctx.currentTime + 1.35);
+        return true;
       } catch {
-        /* 忽略音频异常 */
+        return false;
       }
+    },
+
+    /** 按键路径：立即尝试发声；首个手势时自动建 ctx / 恢复，采样未解码完则等解码后补发。 */
+    play(midi) {
+      if (!this.ctx) {
+        this.ensure().then(() => {
+          this.load(this.timbre);
+          this.playWhenReady(midi, 0);
+        });
+        return;
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx
+          .resume()
+          .then(() => {
+            if (!this.playNow(midi)) this.playWhenReady(midi, 0);
+          })
+          .catch(() => {});
+        return;
+      }
+      if (!this.playNow(midi)) this.playWhenReady(midi, 0);
+    },
+
+    playWhenReady(midi, attempt) {
+      if (attempt > 8) return;
+      const base = this.nearest(this.timbre, midi);
+      if (this.buffers.has(`${this.timbre}:${base}`)) {
+        this.playNow(midi);
+        return;
+      }
+      this.load(this.timbre).then(() => {
+        if (!this.playNow(midi)) {
+          window.setTimeout(() => this.playWhenReady(midi, attempt + 1), 40);
+        }
+      });
     },
 
     setTimbre(timbre) {
       this.timbre = timbre;
-      this.load(timbre);
+      if (this.ctx) this.load(timbre);
     },
   };
+
+  /** 将 ./assets/audio/<timbre>-<midi>.ext 归一成 buffers 的 key。 */
+  function fileKey(timbre, midi) {
+    return `${timbre}:${midi}`;
+  }
 
   function initPractice() {
     const root = $('[data-practice]');
@@ -277,6 +435,17 @@
       timbre: 'harmonica',
       stats: null,
     };
+
+    // 第一次进入练习区附近就开始预抓采样；第一次真实按键只需解码，不必等网络
+    root.addEventListener(
+      'pointerdown',
+      () => {
+        Audio.ensure()
+          .then(() => Audio.load(demo.timbre))
+          .catch(() => {});
+      },
+      { once: true, passive: true },
+    );
 
     const emptyStats = () => ({
       perfect: 0,
@@ -415,9 +584,8 @@
       demo.raf = window.requestAnimationFrame(loop);
     };
 
-    const start = async () => {
+    const start = () => {
       demo.runId += 1;
-      const runId = demo.runId;
       stopLoop();
       if (idle) idle.hidden = true;
       if (result) result.hidden = true;
@@ -426,9 +594,10 @@
       demo.stats = emptyStats();
       updateStats();
 
-      const ready = await Audio.ensure();
-      if (ready) await Audio.load(demo.timbre);
-      if (runId !== demo.runId) return;
+      // 不阻塞谱面开始：解锁音频与解码在后台完成，LEAD_IN 足够覆盖首次解码
+      Audio.ensure()
+        .then(() => Audio.load(demo.timbre))
+        .catch(() => {});
 
       const now = performance.now();
       demo.running = true;
@@ -454,8 +623,13 @@
     };
 
     const judgeInput = (index) => {
+      // 先发声再判定：声音不等待 DOM 更新与评分计算
+      playNote(index);
+      Audio.ensure()
+        .then(() => Audio.load(demo.timbre))
+        .catch(() => {});
       if (!demo.running) {
-        start().then(() => playNote(index));
+        start();
         return;
       }
       const now = performance.now();
@@ -484,7 +658,6 @@
           registerJudge('wrong', 0);
         }
       }
-      playNote(index);
     };
 
     pads.forEach((pad, index) => {
@@ -496,16 +669,18 @@
     if (againButton) againButton.addEventListener('click', () => start());
 
     timbreButtons.forEach((button) => {
-      button.addEventListener('click', async () => {
+      button.addEventListener('click', () => {
         const timbre = button.getAttribute('data-timbre') === 'piano' ? 'piano' : 'harmonica';
         demo.timbre = timbre;
+        Audio.setTimbre(timbre);
         timbreButtons.forEach((item) => {
           const on = item === button;
           item.classList.toggle('is-active', on);
           item.setAttribute('aria-pressed', String(on));
         });
-        const ready = await Audio.ensure();
-        if (ready) Audio.setTimbre(timbre);
+        Audio.ensure()
+          .then(() => Audio.load(timbre))
+          .catch(() => {});
       });
     });
 
@@ -537,15 +712,28 @@
         { threshold: 0.2 },
       );
       observer.observe(root);
+
+      const warmObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            Audio.prefetch();
+            warmObserver.disconnect();
+          }
+        },
+        { rootMargin: '600px 0px' },
+      );
+      warmObserver.observe(root);
     } else {
       demo.visible = true;
+      Audio.prefetch();
     }
   }
 
   function boot() {
     initHero();
     initFlow();
-    initGallery();
+    initChapterRail();
+    initParallax();
     initPractice();
   }
 
