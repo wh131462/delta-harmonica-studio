@@ -1,0 +1,124 @@
+/* 三角洲口琴工坊 · 官网设计令牌
+ *
+ * 与 src/renderer/src/styles/tokens.css 同源：石墨底、琥珀聚光灯、青蓝系统信号、
+ * 暖色谱纸。官网只在此基础上增加「展示级」的字号、章节间距与产品截图阴影，
+ * 不新增品牌色，也不改写应用内的语义。
+ */
+:root {
+  color-scheme: dark;
+
+  /* 中性（冷石墨，蓝相极低） */
+  --canvas: #07080b;
+  --canvas-elev: #0a0c11;
+  --surface-1: #0d1015;
+  --surface-2: #11141b;
+  --surface-3: #161a22;
+  --surface-4: #1c212b;
+  --surface-5: #232935;
+  --surface-inset: #0b0e13;
+  --surface-veil: rgba(13, 16, 21, .82);
+  --hairline: rgba(233, 237, 244, .08);
+  --hairline-strong: rgba(233, 237, 244, .14);
+
+  /* 文本 */
+  --text-1: #e9edf4;
+  --text-2: #a7b0bf;
+  --text-3: #78828f;
+  --text-4: #59616f;
+  --text-on-accent: #1a1204;
+
+  /* 强调与语义 */
+  --accent: #f2b64a;
+  --accent-hover: #ffc866;
+  --accent-press: #dda23a;
+  --accent-soft: rgba(242, 182, 74, .12);
+  --accent-line: rgba(242, 182, 74, .42);
+  --accent-veil: rgba(242, 182, 74, .07);
+  --accent-glow: 0 12px 36px -14px rgba(242, 182, 74, .55);
+  --signal: #5cc8e8;
+  --signal-soft: rgba(92, 200, 232, .12);
+  --signal-line: rgba(92, 200, 232, .36);
+  --ok: #43d39e;
+  --warn: #efb35c;
+  --danger: #f4777a;
+  --focus: rgba(92, 200, 232, .75);
+
+  /* 谱面：唯一暖色区域（夜里的琴房，灯下纸面） */
+  --paper: #16130f;
+  --paper-2: #1a1712;
+  --paper-ink: #f1e7d5;
+  --paper-ink-dim: #a89b86;
+  --paper-line: #4c453b;
+  --paper-line-strong: #b8a98f;
+
+  /* 字体 */
+  --font-sans: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei",
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: "Cascadia Code", "Cascadia Mono", "JetBrains Mono", "SFMono-Regular",
+    Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* 字号（展示级为 clamp，正文与微标沿用应用规格） */
+  --fs-hero: clamp(2.75rem, 6.2vw, 5.5rem);
+  --fs-display: clamp(2.15rem, 4.2vw, 3.5rem);
+  --fs-h2: clamp(1.75rem, 3vw, 2.6rem);
+  --fs-h3: clamp(1.0625rem, 1.4vw, 1.25rem);
+  --fs-lead: clamp(1rem, 1.2vw, 1.125rem);
+  --fs-body: 0.9375rem;
+  --fs-sm: 0.8125rem;
+  --fs-xs: 0.75rem;
+  --fs-micro: 0.6875rem;
+  --fs-metric: clamp(1.75rem, 3vw, 2.5rem);
+
+  /* 间距：4pt 栅格 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 48px;
+  --sp-10: 64px;
+  --sp-12: 80px;
+  --sp-16: 112px;
+
+  /* 布局 */
+  --page-max: 1200px;
+  --page-pad: clamp(20px, 5vw, 40px);
+  --header-h: 64px;
+  --section-gap: clamp(88px, 11vw, 160px);
+  --card-pad: clamp(20px, 2.4vw, 28px);
+  --stage-min-h: 620px;
+
+  /* 圆角 */
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-panel: 14px;
+  --r-shot: 18px;
+  --r-pill: 999px;
+
+  /* 阴影：只用于浮层与产品截图，不用于普通卡片 */
+  --shadow-shot: 0 40px 120px -32px rgba(0, 0, 0, .72), 0 12px 32px -16px rgba(0, 0, 0, .6);
+  --shadow-dialog: 0 40px 120px rgba(0, 0, 0, .62);
+  --shadow-header: 0 16px 40px -24px rgba(0, 0, 0, .8);
+
+  /* 动效 */
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  --dur-4: 420ms;
+  --dur-5: 640ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+
+  /* 层级 */
+  --z-header: 40;
+  --z-mobile-nav: 45;
+  --z-dialog: 100;
+  --z-skip: 120;
+}

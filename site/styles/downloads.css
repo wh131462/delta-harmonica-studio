@@ -1,0 +1,874 @@
+/* 三角洲口琴工坊 · 下载页样式
+ *
+ * 只包含下载页专属结构，类名统一 dl- 前缀；按钮、标签、卡片、分段控件、
+ * 页头页脚等基元全部来自 components.css。强调色只用于「下载」与「Star」
+ * 两个真实动作，其余分层靠字号、留白与表面明度。 */
+
+.dl-main {
+  /* 下载页信息密度高于首页，章节间距在本页面收一档 */
+  --section-gap: clamp(64px, 6.5vw, 112px);
+
+  overflow-x: clip;
+}
+
+/* ============================================================
+   Hero：紧凑的版本信息 + 平台跳转，右侧一张 Star 小卡
+   ============================================================ */
+
+.dl-hero {
+  padding-block-start: calc(var(--header-h) + clamp(40px, 5.5vw, 84px));
+  padding-block-end: clamp(24px, 3vw, 48px);
+}
+
+.dl-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 304px);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: start;
+}
+
+.dl-hero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  min-inline-size: 0;
+}
+
+.dl-hero__title {
+  max-inline-size: 16em;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 5.2vw, 3.4rem);
+  font-weight: 660;
+  letter-spacing: -.025em;
+  line-height: 1.1;
+}
+
+.dl-hero__lead {
+  max-inline-size: 32em;
+  color: var(--text-2);
+  font-size: var(--fs-lead);
+  line-height: 1.78;
+}
+
+.dl-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  margin-block-start: var(--sp-1);
+}
+
+.dl-release {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.dl-release__label {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.dl-release__value {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
+.dl-release__version {
+  color: var(--text-1);
+}
+
+.dl-hero__notes {
+  gap: var(--sp-2);
+}
+
+.dl-hero__jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-block-start: var(--sp-2);
+}
+
+.dl-jump {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.5;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out);
+}
+
+.dl-jump:hover {
+  border-color: var(--hairline-strong);
+  background: var(--surface-3);
+}
+
+.dl-jump__meta {
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+
+/* Star 小卡 */
+.dl-star-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.dl-star-card__title {
+  color: var(--text-1);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.35;
+}
+
+.dl-star-card__text {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.72;
+}
+
+.dl-star-card__action {
+  margin-block-start: var(--sp-1);
+}
+
+.dl-star-card__foot {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: .05em;
+}
+
+/* ============================================================
+   区块头与下载区
+   ============================================================ */
+
+.dl-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  max-inline-size: 760px;
+  margin-block-end: clamp(28px, 4vw, 48px);
+}
+
+.dl-platform-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-5);
+  margin-block-end: var(--sp-5);
+}
+
+.dl-platform-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
+
+.dl-platform-hint .dot {
+  color: var(--signal);
+}
+
+.dl-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.dl-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-inline-size: 0;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+
+/* 自动识别 / 手动切换后的平台卡：靠底色与一条内描边区分，不做重排 */
+.dl-card.is-active {
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--hairline-strong);
+}
+
+.dl-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.dl-card__title {
+  font-size: var(--fs-h3);
+  font-weight: 650;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+}
+
+.dl-card__os {
+  margin-block-start: 4px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: .04em;
+  line-height: 1.5;
+}
+
+.dl-card__badge {
+  flex: none;
+  margin-block-start: 2px;
+}
+
+/* .chip 的 display 会盖过 [hidden]，这里补回隐藏语义 */
+.dl-card__badge[hidden] {
+  display: none;
+}
+
+.dl-card__text {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.72;
+}
+
+.dl-card__hint {
+  margin-block-start: var(--sp-1);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+}
+
+/* ---------- 资产按钮 ---------- */
+
+.dl-assets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-inline-size: 0;
+}
+
+.dl-dl {
+  --btn-h: 58px;
+  justify-content: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  text-align: start;
+  white-space: normal;
+}
+
+.dl-dl__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.dl-dl__label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.dl-dl__meta {
+  display: block;
+  overflow: hidden;
+  opacity: .62;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: .01em;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-dl__arrow {
+  flex: none;
+  opacity: .66;
+}
+
+.dl-dl--sub {
+  --btn-h: 46px;
+  padding-block: 6px;
+}
+
+.dl-dl--sub .dl-dl__label {
+  font-size: var(--fs-xs);
+}
+
+.dl-dl--sub .dl-dl__meta {
+  opacity: .54;
+}
+
+.dl-group {
+  margin-block-start: var(--sp-2);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: .12em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.dl-group:first-child {
+  margin-block-start: 0;
+}
+
+.dl-asset__note {
+  margin-block-start: -2px;
+  padding-inline: var(--sp-1);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
+
+.dl-empty {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
+
+.dl-empty + .btn {
+  margin-block-start: var(--sp-1);
+}
+
+.dl-platforms__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-5);
+  margin-block-start: var(--sp-6);
+  padding-block-start: var(--sp-4);
+  border-block-start: 1px solid var(--hairline);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+}
+
+.dl-platforms__foot code {
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: var(--surface-inset);
+  color: var(--text-2);
+  font-size: .95em;
+}
+
+/* ============================================================
+   安装步骤：tablist + 分平台面板
+   ============================================================ */
+
+.dl-tabs {
+  display: flex;
+  gap: var(--sp-1);
+  border-block-end: 1px solid var(--hairline);
+}
+
+.dl-tab {
+  position: relative;
+  margin-block-end: -1px;
+  padding: var(--sp-3) var(--sp-4);
+  border-block-end: 2px solid transparent;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.5;
+  transition:
+    color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out);
+}
+
+.dl-tab:hover {
+  color: var(--text-1);
+}
+
+.dl-tab[aria-selected="true"] {
+  border-block-end-color: var(--accent);
+  color: var(--text-1);
+}
+
+.dl-panel {
+  padding-block-start: var(--sp-7);
+}
+
+.dl-panel[hidden] {
+  display: none;
+}
+
+.dl-panel:focus-visible {
+  outline-offset: var(--sp-3);
+}
+
+.dl-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-6) var(--sp-8);
+}
+
+.dl-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.dl-step__num {
+  padding-block-start: 2px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .04em;
+  line-height: 1.7;
+}
+
+.dl-step__title {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  letter-spacing: -.005em;
+  line-height: 1.5;
+}
+
+.dl-step__text {
+  margin-block-start: var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.78;
+}
+
+.dl-step kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: .94em;
+  line-height: 1.45;
+}
+
+.dl-cmd {
+  margin-block-start: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  overflow-x: auto;
+  border-radius: var(--r-md);
+  background: var(--surface-inset);
+}
+
+.dl-cmd code {
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dl-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin-block-start: var(--sp-8);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.dl-tip__label {
+  flex: none;
+  margin-block-start: 1px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--signal-soft);
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: .06em;
+  line-height: 1.8;
+}
+
+.dl-tip__text {
+  max-inline-size: 78ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+}
+
+/* ============================================================
+   能力矩阵
+   ============================================================ */
+
+.dl-table-wrap {
+  overflow-x: auto;
+  border-block: 1px solid var(--hairline);
+}
+
+.dl-table {
+  inline-size: 100%;
+  min-inline-size: 620px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.dl-table th,
+.dl-table td {
+  padding: var(--sp-3) var(--sp-4);
+  border-block-end: 1px solid var(--hairline);
+  text-align: start;
+  vertical-align: top;
+}
+
+.dl-table tbody tr:last-child th,
+.dl-table tbody tr:last-child td {
+  border-block-end: 0;
+}
+
+.dl-table thead th {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: .12em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dl-table thead th:first-child {
+  inline-size: 46%;
+}
+
+.dl-table thead th:not(:first-child) {
+  inline-size: 18%;
+}
+
+.dl-table tbody th {
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.dl-table thead th:not(:first-child),
+.dl-table tbody td {
+  text-align: center;
+}
+
+.dl-mark {
+  display: inline-block;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.dl-mark--ok {
+  color: var(--ok);
+}
+
+.dl-mark--none {
+  color: var(--text-3);
+}
+
+.dl-mark--partial {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  letter-spacing: .02em;
+}
+
+.dl-mark__note {
+  display: block;
+  margin-block-start: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.dl-table-hint {
+  display: none;
+}
+
+/* ============================================================
+   已知限制 / FAQ
+   ============================================================ */
+
+.dl-faq__grid {
+  display: grid;
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: start;
+}
+
+.dl-faq__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  max-inline-size: 44ch;
+}
+
+.dl-faq__intro .arrow-link {
+  margin-block-start: var(--sp-1);
+}
+
+.dl-faq__list {
+  border-block-start: 1px solid var(--hairline);
+}
+
+.dl-faq__item {
+  border-block-end: 1px solid var(--hairline);
+}
+
+.dl-faq__q {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding-block: var(--sp-4);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dl-faq__q::-webkit-details-marker {
+  display: none;
+}
+
+.dl-faq__q::after {
+  content: "+";
+  flex: none;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  line-height: 1;
+  transition: color var(--dur-2) var(--ease-out);
+}
+
+.dl-faq__q:hover::after {
+  color: var(--text-1);
+}
+
+.dl-faq__item[open] .dl-faq__q::after {
+  content: "−";
+}
+
+.dl-faq__a {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-inline-size: 68ch;
+  padding-block-end: var(--sp-5);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.78;
+}
+
+.dl-faq__a strong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.dl-faq__a code {
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: var(--surface-inset);
+  color: var(--text-2);
+  font-size: .94em;
+}
+
+.dl-faq__a kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: .94em;
+  line-height: 1.45;
+}
+
+/* ============================================================
+   Star 欢迎区
+   ============================================================ */
+
+.dl-star__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: clamp(28px, 4.5vw, 56px);
+  border-radius: var(--r-xl);
+  background: var(--surface-2);
+}
+
+.dl-star__title {
+  max-inline-size: 20em;
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: 650;
+  letter-spacing: -.02em;
+  line-height: 1.16;
+}
+
+.dl-star__lead {
+  max-inline-size: 54ch;
+  color: var(--text-2);
+  font-size: var(--fs-lead);
+  line-height: 1.75;
+}
+
+.dl-star__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-block-start: var(--sp-2);
+}
+
+.dl-star__count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  opacity: .68;
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+
+@media (max-width: 1080px) {
+  .dl-hero__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 272px);
+    gap: var(--sp-8);
+  }
+}
+
+@media (max-width: 960px) {
+  .dl-hero__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-8);
+  }
+
+
+
+  .dl-star-card {
+    max-inline-size: 420px;
+  }
+
+  .dl-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+  }
+
+  .dl-card {
+    max-inline-size: 560px;
+  }
+
+  .dl-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+  }
+
+  .dl-faq__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-8);
+  }
+
+  .dl-faq__intro {
+    max-inline-size: 56ch;
+  }
+}
+
+@media (max-width: 640px) {
+  .dl-hero {
+    padding-block-start: calc(var(--header-h) + clamp(32px, 9vw, 48px));
+  }
+
+  .dl-hero__lead {
+    font-size: var(--fs-body);
+  }
+
+  .dl-hero__meta {
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .dl-platform-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dl-card {
+    max-inline-size: none;
+  }
+
+  .dl-tip {
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+  }
+
+  .dl-panel {
+    padding-block-start: var(--sp-5);
+  }
+
+  .dl-star__actions {
+    inline-size: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dl-star__actions .btn {
+    inline-size: 100%;
+  }
+
+  .dl-star__panel {
+    padding: var(--sp-6) var(--sp-5);
+  }
+
+  .dl-table th,
+  .dl-table td {
+    padding: var(--sp-3);
+  }
+}
+
+@media (max-width: 700px) {
+  .dl-table-hint {
+    display: block;
+    margin-block-start: var(--sp-2);
+    color: var(--text-3);
+    font-size: var(--fs-xs);
+    line-height: 1.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-jump,
+  .dl-card,
+  .dl-dl,
+  .dl-tab,
+  .dl-faq__q::after {
+    transition: none;
+  }
+}
