@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    env:
+      # 单元测试与未打包构建不需要证书；避免 CI 在钥匙串里搜索签名身份
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check audio samples
+        shell: bash
+        run: |
+          if [ ! -d resources/audio-samples ]; then
+            echo "::warning::resources/audio-samples 缺失：采样相关单元测试会跳过，打包产物也不会包含真实音源。"
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build renderer / main / preload
+        run: npm run build
+
+      # 三端都跑一次未打包目录构建，提前暴露 electron-builder 的平台配置问题。
+      - name: Package smoke test (unpacked)
+        run: npm run dist:dir
+
+      - name: Upload unpacked build
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failed-${{ matrix.os }}
+          path: |
+            out/**
+            release/**
+          if-no-files-found: ignore
+          retention-days: 3

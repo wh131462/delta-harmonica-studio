@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # 有证书时在仓库 Secrets 配置 CSC_LINK / CSC_KEY_PASSWORD（.p12 的 base64）即可自动签名；
+  # 未配置时 macOS 使用 after-pack 的 ad-hoc 签名，Windows / Linux 保持未签名。
+  CSC_LINK: ${{ secrets.CSC_LINK }}
+  CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+jobs:
+  build:
+    name: package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            args: --win --x64
+            artifact: |
+              release/*.exe
+          - name: macos-x64-and-arm64
+            os: macos-latest
+            args: --mac --x64 --arm64
+            artifact: |
+              release/*.dmg
+              release/*.zip
+          - name: linux-x64
+            os: ubuntu-latest
+            args: --linux --x64
+            artifact: |
+              release/*.AppImage
+              release/*.deb
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # 安装包依赖 resources/audio-samples 下的真实采样；缺失时直接失败，避免发出无声的安装包。
+      - name: Verify audio samples
+        shell: bash
+        run: |
+          if [ ! -d resources/audio-samples ]; then
+            echo "::error::resources/audio-samples 缺失：请把真实采样提交到仓库（或通过 LFS / 构建前脚本准备）后再发布。"
+            exit 1
+          fi
+          find resources/audio-samples -type f \( -name '*.wav' -o -name '*.mp3' \) | wc -l
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and test
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        shell: bash
+        run: npx electron-builder ${{ matrix.args }} --config electron-builder.yml
+
+      - name: List release files
+        shell: bash
+        run: ls -lh release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: delta-harmonica-${{ matrix.name }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  publish:
+    name: publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          append_body: true
+          body: |
+            ## 平台说明
+
+            - **Windows 10 / 11 x64**：完整功能，含向《三角洲行动》注入键鼠（需以管理员身份运行）。
+            - **macOS 12+（Intel / Apple Silicon）**：编辑、导入、练习、试听、宏导出可用；游戏注入不可用，演奏以排练模式运行。
+            - **Linux x64**：同上；Wayland 下悬浮窗的位置与置顶由桌面合成器决定。
+
+            macOS / Linux 包未做代码签名与公证（macOS 已做 ad-hoc 签名），首次打开时可能被系统拦截：
+            macOS 请右键「打开」或在「系统设置 → 隐私与安全性」中允许；Linux AppImage 需要 `chmod +x`。
+            详细构建说明见 `docs/PLATFORM_SUPPORT.md`。
