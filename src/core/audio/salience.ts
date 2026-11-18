@@ -75,20 +75,24 @@ const VOICED_CLARITY_FOR_POLYPHONY = 0.2;
 /** 单帧最多收集的谱峰数 */
 const MAX_PEAKS_PER_FRAME = 48;
 
-/** 预计算每个候选音高的先验权重（音域先验 + 中高音区偏好） */
+/** 预计算每个候选音高的先验权重（音域先验 + 人声/主奏音区偏好 + 低音抑制） */
 function buildPitchPrior(pitchMin: number, pitchMax: number): Float64Array {
   const count = pitchMax - pitchMin + 1;
   const center = (pitchMin + pitchMax) / 2;
   const halfSpan = Math.max(1, (pitchMax - pitchMin) / 2);
-  const span = Math.max(1, pitchMax - pitchMin);
   const prior = new Float64Array(count);
+  // 人声/主奏乐器通常落在中音区；这里不做“越高越好”的硬偏好，只用一条很缓的
+  // 音区权重 + 明确的低音抑制，避免被贝斯/和弦根音带跑，也避免把高音伴奏当旋律。
+  const vocalCenter = 66;
+  const vocalSigma = 16;
   for (let i = 0; i < count; i += 1) {
     const midi = pitchMin + i;
     // 音域先验：越靠近音域中心权重越高（抑制极端音区的错误候选）
     const rangePrior = 1 - 0.18 * (Math.abs(midi - center) / halfSpan) ** 2;
-    // 中高音区偏好：主旋律通常落在中高音区，给一条缓坡（不是硬性 skyline）
-    const registerPrior = 0.82 + 0.4 * ((midi - pitchMin) / span);
-    prior[i] = rangePrior * registerPrior;
+    const registerPrior = 0.75 + 0.25 * Math.exp(-0.5 * ((midi - vocalCenter) / vocalSigma) ** 2);
+    // 低音抑制：C2-G3 一带通常是贝斯/底鼓/和弦低音，不是主旋律
+    const bassGuard = 0.35 + 0.65 * Math.min(1, Math.max(0, (midi - 47) / 9));
+    prior[i] = rangePrior * registerPrior * bassGuard;
   }
   return prior;
 }

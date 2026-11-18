@@ -111,7 +111,7 @@ const DEFAULT_CLARITY_THRESHOLD = 0.3;
 /** auto 模式判定为复音的 polyphonyScore 阈值 */
 const AUTO_POLYPHONY_THRESHOLD = 0.45;
 /** 相邻同音高音符合并的最大间隔（秒） */
-const NOTE_MERGE_GAP_SEC = 0.03;
+const NOTE_MERGE_GAP_SEC = 0.02;
 /** 迟滞切分：偏离当前参考音高 ≤ 该值（半音）视为同音 */
 const PITCH_SAME_TOLERANCE = 0.7;
 /** 迟滞切分：偏离 > 该值（半音）立即切分 */
@@ -130,10 +130,18 @@ const MIN_POLY_NOTE_CONFIDENCE = 0.18;
 const LOW_NOTE_CONFIDENCE = 0.35;
 /** HPSS 谐波占比低于该值的分析帧在单声部候选中视为打击帧丢弃 */
 const HPSS_HARMONIC_GATE = 0.35;
+/** 绝对静音阈值：帧能量（相对全局最大值）低于该值视为换气/断音 */
+const SILENCE_DIP_ENERGY = 0.03;
 /** 单帧能量低于“本音符最大能量”的该比例时，认为是重新起音（用于同音重复切分） */
-const ENERGY_DIP_RATIO = 0.62;
-/** Viterbi 中音高高于最高活跃音时的 skyline 权重（主旋律通常是最高声部） */
-const SKYLINE_BONUS_WEIGHT = 0.55;
+const ENERGY_DIP_RATIO = 0.3;
+/** Viterbi 中音高高于最高活跃音时的 skyline 权重（主旋律通常在最上方活跃声部） */
+const SKYLINE_BONUS_WEIGHT = 0.6;
+/** 跟踪时“时间平滑显著度”与“原始显著度”的混合比例：保留一部分起音瞬态信息 */
+const SMOOTHED_SALIENCE_WEIGHT = 0.6;
+/** 显著度时间平滑半径（帧）：约 11 帧 ≈ 128ms，长音被强化、16 分音符式经过音被压弱 */
+const SALIENCE_SMOOTH_RADIUS = 5;
+/** 音高切换基础代价：越大越倾向长音（抑制 16 分音符式琶音） */
+const PITCH_SWITCH_COST = 1.05;
 /** Viterbi 静音状态的观测地板 */
 const SILENCE_OBS_FLOOR = 0.01;
 /** 起音包络去趋势半窗（秒） */
@@ -349,8 +357,66 @@ function transitionCost(from: number, to: number, onsetStrength: number, silence
     cost = 3.6; // 超过八度：极高代价（避免乱跳）
   }
   // 起音处换音代价打折：音符边界通常伴随起音
-  cost += 0.5 - 0.35 * onsetStrength;
+  cost += PITCH_SWITCH_COST - 0.45 * onsetStrength;
   return cost;
+}
+
+/**
+ * 计算逐帧原始能量（0..1，相对全曲最大值）。
+ * 用于同音重复切分：必须用未做 HPSS 的原始谱，HPSS 的谐波中值滤波会把 40ms 的换气
+ * 间隙“抹平”，导致重复音被并成一个长音。
+ */
+function computeFrameEnergy(spectrogram: MagnitudeSpectrogram): Float32Array {
+  const { magnitude, frameCount, binCount } = spectrogram;
+  const energy = new Float32Array(frameCount);
+  let peak = 0;
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const offset = frame * binCount;
+    let sum = 0;
+    for (let bin = 0; bin < binCount; bin += 1) {
+      const value = magnitude[offset + bin];
+      sum += value * value;
+    }
+    energy[frame] = sum;
+    if (sum > peak) peak = sum;
+  }
+  if (peak > 1e-12) {
+    const gain = 1 / peak;
+    for (let frame = 0; frame < frameCount; frame += 1) energy[frame] *= gain;
+  }
+  return energy;
+}
+
+/**
+ * 对显著度做时间轴平滑（三角核，半径 SALIENCE_SMOOTH_RADIUS）。
+ * 主旋律是“持续发声”的声部，约 130ms 的平均能量远高于 16 分音符式的琶音经过音；
+ * 这比单纯 skyline 更能区分“唱出来的长音”和“弹出来的快速音型”。
+ */
+function smoothSalienceInTime(salience: SalienceMatrix): Float32Array {
+  const { values, frameCount, pitchCount } = salience;
+  const radius = SALIENCE_SMOOTH_RADIUS;
+  if (frameCount === 0 || radius <= 0) return values.slice();
+  const out = new Float32Array(values.length);
+  const kernel: number[] = [];
+  let kernelSum = 0;
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    const weight = radius + 1 - Math.abs(offset);
+    kernel.push(weight);
+    kernelSum += weight;
+  }
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const base = frame * pitchCount;
+    for (let index = 0; index < pitchCount; index += 1) {
+      let sum = 0;
+      for (let offset = -radius; offset <= radius; offset += 1) {
+        const sourceFrame = frame + offset;
+        if (sourceFrame < 0 || sourceFrame >= frameCount) continue;
+        sum += values[sourceFrame * pitchCount + index] * kernel[offset + radius];
+      }
+      out[base + index] = sum / kernelSum;
+    }
+  }
+  return out;
 }
 
 /**
@@ -625,7 +691,7 @@ function splitRawNotesAtEnergyDips(
     let pieceStartSec = note.startSec;
     let pieceStartFrame = startFrame;
     let lastSplitFrame = Number.NEGATIVE_INFINITY;
-    let didSplit = false;
+    let lastCutDeep = false;
     for (const onsetFrame of onsetFrames) {
       if (onsetFrame - pieceStartFrame < minNoteFrames) continue;
       if (endFrame - onsetFrame < minNoteFrames) continue;
@@ -641,18 +707,25 @@ function splitRawNotesAtEnergyDips(
           dipFrame = frame;
         }
       }
-      if (!(dipEnergy < ENERGY_DIP_RATIO * maxEnergy)) continue;
+      if (!(dipEnergy < ENERGY_DIP_RATIO * maxEnergy)) {
+        // 相对能量还没低到阈值，但如果已经是“接近静音”的绝对低能量（真正的换气/断音），
+        // 也应当切开——这样重复音不会被并成一个长音，而人声咬字的浅能量谷不会被误切。
+        if (!(dipEnergy < SILENCE_DIP_ENERGY)) continue;
+      }
       if (dipFrame - pieceStartFrame < minNoteFrames || endFrame - dipFrame < minNoteFrames) continue;
       const splitSec = dipFrame * hopSec + frameCenterOffsetSec - hopSec * 0.5;
       if (splitSec - pieceStartSec < minNoteSec || note.endSec - splitSec < minNoteSec) continue;
+      // 只有“接近静音”的切口才标记为独立重音；浅能量谷（咬字/颤音）切出来的碎片
+      // 在 finalize 里会被合并回一个长音。
+      const deepCut = dipEnergy < SILENCE_DIP_ENERGY || dipEnergy < 0.1 * maxEnergy;
       result.push({
         startSec: pieceStartSec,
         endSec: splitSec,
         midi: note.midi,
         confidence: note.confidence,
-        keepSeparate: true,
+        ...(deepCut ? { keepSeparate: true } : {}),
       });
-      didSplit = true;
+      lastCutDeep = deepCut;
       pieceStartSec = splitSec;
       pieceStartFrame = dipFrame;
       lastSplitFrame = dipFrame;
@@ -662,7 +735,7 @@ function splitRawNotesAtEnergyDips(
       endSec: note.endSec,
       midi: note.midi,
       confidence: note.confidence,
-      ...(didSplit ? { keepSeparate: true } : {}),
+      ...(lastCutDeep || note.keepSeparate ? { keepSeparate: true } : {}),
     });
   }
 
@@ -709,11 +782,13 @@ function splitNotesAtEnergyDipsFallback(
     let pieceStartSec = note.startSec;
     let pieceStartFrame = startFrame;
     let lastSplitFrame = Number.NEGATIVE_INFINITY;
-    let didSplit = false;
+    let lastCutDeep = note.keepSeparate === true;
     for (let frame = startFrame + minNoteFrames; frame <= endFrame - minNoteFrames; frame += 1) {
       if (frame <= 0 || frame >= frameEnergy.length - 1) continue;
       const energy = frameEnergy[frame];
-      if (!(energy < ENERGY_DIP_RATIO * 0.85 * maxEnergy)) continue;
+      const relativeDip = energy < ENERGY_DIP_RATIO * 0.85 * maxEnergy;
+      const absoluteDip = energy < SILENCE_DIP_ENERGY;
+      if (!relativeDip && !absoluteDip) continue;
       // 局部极小：比左右相邻帧都低
       if (!(energy <= frameEnergy[frame - 1] && energy <= frameEnergy[frame + 1])) continue;
       // 之后要能量恢复（说明是重新起音，而不是整体衰减）
@@ -726,14 +801,15 @@ function splitNotesAtEnergyDipsFallback(
       if (frame - lastSplitFrame < minNoteFrames) continue;
       const splitSec = frame * hopSec + frameCenterOffsetSec - hopSec * 0.5;
       if (splitSec - pieceStartSec < minNoteSec || note.endSec - splitSec < minNoteSec) continue;
+      const deepCut = energy < SILENCE_DIP_ENERGY || energy < 0.1 * maxEnergy;
       result.push({
         startSec: pieceStartSec,
         endSec: splitSec,
         midi: note.midi,
         confidence: note.confidence,
-        keepSeparate: true,
+        ...(lastCutDeep || deepCut ? { keepSeparate: true } : {}),
       });
-      didSplit = true;
+      lastCutDeep = deepCut;
       pieceStartSec = splitSec;
       pieceStartFrame = frame;
       lastSplitFrame = frame;
@@ -743,7 +819,7 @@ function splitNotesAtEnergyDipsFallback(
       endSec: note.endSec,
       midi: note.midi,
       confidence: note.confidence,
-      ...(didSplit ? { keepSeparate: true } : {}),
+      ...(lastCutDeep ? { keepSeparate: true } : {}),
     });
   }
 
@@ -765,7 +841,14 @@ function extractPolyphonicCandidate(
   const { frameCount, pitchCount, values, frameClarity } = salience;
   if (frameCount === 0) return { rawNotes: [], voicedRatio: 0 };
 
-  const path = trackPitchPath(salience, clarityGate, rhythm.envelope);
+  // 先做时间平滑：长音强化、快速经过音压弱；再与原始显著度混合，保留起音瞬态。
+  const smoothed = smoothSalienceInTime(salience);
+  const blended = new Float32Array(smoothed.length);
+  for (let index = 0; index < blended.length; index += 1) {
+    blended[index] = SMOOTHED_SALIENCE_WEIGHT * smoothed[index] + (1 - SMOOTHED_SALIENCE_WEIGHT) * values[index];
+  }
+  const tracking: SalienceMatrix = { ...salience, values: blended };
+  const path = trackPitchPath(tracking, clarityGate, rhythm.envelope);
   const runs = buildPitchRuns(path);
 
   const joinedNotes: RawNote[] = [];
@@ -775,7 +858,7 @@ function extractPolyphonicCandidate(
   }
 
   for (const run of runs) {
-    const midi = correctRunOctaves(run, salience, pitchMin);
+    const midi = correctRunOctaves(run, tracking, pitchMin);
     const startSec = Math.max(0, run.startFrame * hopSec + frameCenterOffsetSec - hopSec * 0.5);
     const endSec = Math.min(totalSec, run.endFrame * hopSec + frameCenterOffsetSec + hopSec * 0.5);
     if (!(endSec > startSec)) continue;
@@ -788,7 +871,7 @@ function extractPolyphonicCandidate(
     for (let frame = run.startFrame; frame <= run.endFrame; frame += 1) {
       claritySum += frameClarity[frame];
       if (pitchIndex >= 0 && pitchIndex < pitchCount) {
-        salienceSum += values[frame * pitchCount + pitchIndex];
+        salienceSum += tracking.values[frame * pitchCount + pitchIndex];
       }
       frames += 1;
     }
@@ -1078,15 +1161,15 @@ function finalizeRawNotes(rawNotes: RawNote[], options: FinalizeOptions): Finali
     .sort((a, b) => a.startSec - b.startSec);
 
   // 1) 合并间隔很小的同音高音符：
-  //    - 同音重复切分产生的小段（keepSeparate）保持独立；
-  //    - 完全首尾相接（gap≈0）的同音高段来自切分边界，也保持独立，否则重复音会被并回一个长音；
-  //    - 只有存在正间隔且 ≤30ms 的碎音才合并（多半是检测抖动产生的重复片段）。
+  //    - 起音/能量谷切分会把持续音切成首尾相接的碎片；只有“浅切分”（keepSeparate=false）
+  //      才说明它仍是同一个长音，需要合并回来；
+  //    - 真正的重新起音（能量掉到近静音）会被标记 keepSeparate，保持独立。
   const merged: RawNote[] = [];
   for (const note of sorted) {
     const last = merged.length > 0 ? merged[merged.length - 1] : null;
     if (last && last.midi === note.midi && !last.keepSeparate && !note.keepSeparate) {
       const gap = note.startSec - last.endSec;
-      if (gap > 1e-6 && gap <= NOTE_MERGE_GAP_SEC) {
+      if (gap <= NOTE_MERGE_GAP_SEC) {
         last.endSec = Math.max(last.endSec, note.endSec);
         last.confidence = Math.max(last.confidence, note.confidence);
         continue;
@@ -1325,17 +1408,19 @@ export function extractMainMelody(
 
   // ---------- 7. 同音重复切分（起音 + 能量谷两遍） ----------
   if (rawNotes.length > 0) {
+    // 用原始谱能量而非 HPSS 谐波能量：后者会抹平短换气间隙，导致重复音并成一个长音。
+    const splitEnergy = computeFrameEnergy(spectrogram);
     const splitNotes = splitRawNotesAtEnergyDips(
       rawNotes,
       rhythm.onsetFrames,
-      salience.frameEnergy,
+      splitEnergy,
       hopSec,
       frameCenterOffsetSec,
       minNoteMs / 1000,
     );
     rawNotes = splitNotesAtEnergyDipsFallback(
       splitNotes,
-      salience.frameEnergy,
+      splitEnergy,
       hopSec,
       frameCenterOffsetSec,
       minNoteMs / 1000,

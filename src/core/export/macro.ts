@@ -2,9 +2,14 @@
  * 鼠标宏 / 触发键位表导出。
  *
  * 设计目标：
- * - 用户可以把曲谱导出成鼠标宏驱动（罗技 G HUB / AutoHotkey / 支持"按键+延时"的通用宏编辑器）可用的脚本；
+ * - 用户可以把曲谱导出成鼠标宏驱动（罗技 G HUB / AutoHotkey v1 与 v2 / 支持"按键+延时"的通用宏编辑器）可用的脚本；
  * - 同时给出"触发键位表"：全音域 38 个半音分别该按哪个音键 + 哪个鼠标修饰键，以及本曲每个音的触发时间/保持时长；
  * - 与软件内演奏使用同一份 PlaybackPlan（同一套时序、移调、折返结果），保证"照着表/跑宏"和软件内演奏一致。
+ *
+ * 品牌支持范围：
+ * - 只有罗技 G HUB 提供公开的脚本引擎，能导入我们生成的原生宏；
+ * - 雷蛇 / 海盗船 / 赛睿 / 血手 / 冰豹 等的宏只能录制，存在私有配置里，没有可写入的脚本格式；
+ * - 因此跨品牌路径是 AutoHotkey（宏软件自己模拟键鼠，与鼠标品牌无关），见 MACRO_SOFTWARE_ROWS。
  *
  * 键位模型（与游戏内一致）：
  * - 音键：Z X C V B N M , → 1 2 3 4 5 6 7 高音1
@@ -14,12 +19,12 @@ import { allCombos, DEFAULT_HARMONICA, formatCombo, type MouseButton, type Physi
 import { midiToName } from '../model/pitch';
 import type { InputEvent, PlaybackPlan, PlannedNote } from '../instrument/plan';
 
-export type MacroFormat = 'ahk' | 'lua' | 'csv' | 'trigger-table';
+export type MacroFormat = 'ahk' | 'ahk2' | 'lua' | 'csv' | 'trigger-table';
 
 export interface MacroExportOptions {
   title?: string;
   artist?: string;
-  /** AHK 触发键，默认 F9；可填 XButton1 / XButton2（鼠标侧键） */
+  /** AHK 触发键（v1 / v2 通用），默认 F9；可填 XButton1 / XButton2（鼠标侧键） */
   ahkTrigger?: string;
   /** 罗技 OnEvent 的鼠标按钮编号，默认 5（前进侧键）；4=后退 5=前进 */
   logitechTriggerButton?: number;
@@ -77,6 +82,84 @@ const LUA_KEY: Record<string, string> = {
 };
 const MOUSE_LABEL: Record<MouseButton, string> = { left: '左键', middle: '中键', right: '右键' };
 const MOUSE_ACTION: Record<MouseButton, string> = { left: '降八度', middle: '升半音', right: '升八度' };
+
+/**
+ * 宏软件支持程度：
+ * - native：软件自带脚本引擎，可导入我们生成的文件（目前只有罗技 G HUB 的 Lua）；
+ * - universal：通用宏软件，由它自己模拟键鼠，与鼠标品牌无关（AutoHotkey）；
+ * - record-only：宏只能录制、存在私有配置里，没有可导入的脚本格式。
+ */
+export type MacroSoftwareSupport = 'native' | 'universal' | 'record-only';
+
+export interface MacroSoftwareRow {
+  /** 宏软件 / 驱动名 */
+  software: string;
+  /** 适用鼠标品牌 */
+  brand: string;
+  support: MacroSoftwareSupport;
+  /** 推荐导出 */
+  format: string;
+  /** 一句话解释能不能导入 */
+  note: string;
+}
+
+export const MACRO_SUPPORT_LABEL: Record<MacroSoftwareSupport, string> = {
+  native: '原生脚本',
+  universal: '通用脚本',
+  'record-only': '仅录制',
+};
+
+/**
+ * 宏软件兼容性对照表（界面与导出文档共用同一份数据）。
+ *
+ * 结论：宏导出本质是「宏软件模拟键鼠」，与鼠标品牌无关。品牌专属格式里只有罗技能生成，
+ * 因为 G HUB 公开提供 Lua 引擎；雷蛇 / 海盗船 / 赛睿 / 血手 / 冰豹 等只支持录制或私有 XML，
+ * 硬生成容易导入失败，所以统一推荐 AutoHotkey 或 CSV 手工录入。
+ */
+export const MACRO_SOFTWARE_ROWS: MacroSoftwareRow[] = [
+  {
+    software: '罗技 G HUB',
+    brand: '罗技 G 系列',
+    support: 'native',
+    format: '罗技 G HUB Lua',
+    note: '内置 Lua 引擎，可直接粘贴脚本；旧版 Gaming Software 基本兼容。',
+  },
+  {
+    software: 'AutoHotkey v1.1',
+    brand: '任意品牌',
+    support: 'universal',
+    format: 'AHK 宏脚本',
+    note: '按扫描码模拟，游戏里兼容性最好；需与游戏同为管理员权限。',
+  },
+  {
+    software: 'AutoHotkey v2',
+    brand: '任意品牌',
+    support: 'universal',
+    format: 'AHK v2 宏脚本',
+    note: '官网现在默认发 v2；v1 脚本在 v2 上跑不起来，反之亦然。',
+  },
+  {
+    software: '雷蛇 Synapse 3 / 4',
+    brand: '雷蛇',
+    support: 'record-only',
+    format: 'AHK 脚本 / CSV 时序表',
+    note: '宏只能录制；XML 结构未公开且随版本变化，不生成。',
+  },
+  {
+    software: '海盗船 iCUE / 赛睿 GG',
+    brand: '对应品牌',
+    support: 'record-only',
+    format: 'AHK 脚本 / CSV 时序表',
+    note: '只提供录制或逐条编辑，没有可导入的脚本格式。',
+  },
+  {
+    software: '血手宝典 / 冰豹 Swarm / HyperX NGENUITY',
+    brand: '对应品牌',
+    support: 'record-only',
+    format: 'AHK 脚本 / CSV 时序表',
+    note: '同样只能录制；宏在驱动私有配置里，跨软件不可移植。',
+  },
+];
 
 function keyLabelOf(keyId: string | undefined): string {
   return DEFAULT_HARMONICA.noteKeys.find((key) => key.id === keyId)?.label ?? keyId ?? '?';
@@ -209,6 +292,7 @@ export function generateAhkMacro(plan: PlaybackPlan, options: MacroExportOptions
   for (const line of commonHeaderLines(plan, options)) lines.push(`; ${line}`);
   lines.push('; ------------------------------------------------------------');
   lines.push('; 使用说明：');
+  lines.push('; 0. 本脚本是 AHK v1 语法：若你装的是 AutoHotkey v2，请改用「AHK v2 脚本」导出（两者不兼容）；');
   lines.push('; 1. 安装 AutoHotkey v1，右键本脚本 →「以管理员身份运行」（否则游戏会丢弃模拟按键）；');
   lines.push('; 2. 游戏设置为「无边框窗口」，进入口琴手动演奏界面；');
   lines.push(`; 3. 按触发键 ${trigger} 开始/中止；鼠标侧键也可触发（见下方注释）；`);
@@ -269,7 +353,92 @@ export function generateAhkMacro(plan: PlaybackPlan, options: MacroExportOptions
     format: 'ahk',
     text: lines.join('\r\n'),
     extension: 'ahk',
-    filterName: 'AutoHotkey 宏脚本',
+    filterName: 'AutoHotkey v1 宏脚本',
+    warnings: plan.warnings,
+    eventCount: plan.events.length,
+    noteCount: plan.stats.noteCount,
+  };
+}
+
+/**
+ * 生成 AutoHotkey v2 宏脚本。
+ *
+ * v2 与 v1 语法不兼容（官网现在默认发 v2），因此单独生成：
+ * - 热键用函数对象注册：`Hotkey triggerHotkey, StartMacro`；
+ * - 回调带 `(*)` 吸收 AHK 传入的热键名参数；
+ * - 控制流统一写花括号（v2 允许省略，但花括号更不容易踩缩进/单行语句的坑）。
+ */
+export function generateAhk2Macro(plan: PlaybackPlan, options: MacroExportOptions = {}): MacroExportResult {
+  const trigger = (options.ahkTrigger ?? 'F9').trim() || 'F9';
+  const lines: string[] = [];
+  lines.push('; ============================================================');
+  lines.push('; 三角洲口琴工坊 · 鼠标宏导出（AutoHotkey v2）');
+  for (const line of commonHeaderLines(plan, options)) lines.push(`; ${line}`);
+  lines.push('; ------------------------------------------------------------');
+  lines.push('; 使用说明：');
+  lines.push('; 1. 安装 AutoHotkey v2（官网默认版本），右键本脚本 →「以管理员身份运行」（否则游戏会丢弃模拟按键）；');
+  lines.push('; 2. 游戏设置为「无边框窗口」，进入口琴手动演奏界面；');
+  lines.push(`; 3. 按触发键 ${trigger} 开始/中止；鼠标侧键也可触发（见下方注释）；`);
+  lines.push('; 4. 急停：按 F10 重新加载脚本（立即中止宏）；或关闭 AHK 托盘图标；');
+  lines.push('; 5. 若游戏内无反应：确认 AHK 与游戏同为管理员权限、游戏窗口在前台、光标在游戏窗口内。');
+  lines.push('; 6. 本脚本属于第三方模拟输入，与软件内注入同样存在账号风险，请自行判断使用场景。');
+  lines.push('; ============================================================');
+  lines.push('#Requires AutoHotkey v2.0');
+  lines.push('#SingleInstance Force');
+  lines.push('#MaxThreadsPerHotkey 2  ; 允许再按一次触发键中止正在跑的宏');
+  lines.push('SendMode "Input"');
+  lines.push('SetWorkingDir A_ScriptDir');
+  lines.push('');
+  lines.push('playing := false');
+  lines.push(`triggerHotkey := "${trigger}"`);
+  lines.push('Hotkey triggerHotkey, StartMacro');
+  lines.push('; 鼠标侧键触发（去掉下面其中一行的注释即可）');
+  lines.push('; Hotkey "XButton1", StartMacro');
+  lines.push('; Hotkey "XButton2", StartMacro');
+  lines.push('F10::Reload()  ; 急停：重新加载脚本');
+  lines.push('');
+  lines.push('StartMacro(*) {');
+  lines.push('  global playing');
+  lines.push('  if (playing) {');
+  lines.push('    playing := false');
+  lines.push('    return');
+  lines.push('  }');
+  lines.push('  playing := true');
+  lines.push('  PlayMacro()');
+  lines.push('  playing := false');
+  lines.push('}');
+  lines.push('');
+  lines.push('Wait(ms) {');
+  lines.push('  global playing');
+  lines.push('  end := A_TickCount + ms');
+  lines.push('  while (A_TickCount < end) {');
+  lines.push('    if (!playing) {');
+  lines.push('      return');
+  lines.push('    }');
+  lines.push('    Sleep 5');
+  lines.push('  }');
+  lines.push('}');
+  lines.push('');
+  lines.push('PlayMacro() {');
+  lines.push('  global playing');
+  let cursor = 0;
+  for (const event of plan.events) {
+    const delta = Math.max(0, event.t - cursor);
+    if (delta > 0) lines.push(`  Wait(${delta})`);
+    cursor = event.t;
+    lines.push('  if (!playing) {');
+    lines.push('    return');
+    lines.push('  }');
+    lines.push(`  SendInput "${ahkToken(event)}"`);
+  }
+  lines.push('}');
+  lines.push('');
+
+  return {
+    format: 'ahk2',
+    text: lines.join('\r\n'),
+    extension: 'ahk',
+    filterName: 'AutoHotkey v2 宏脚本',
     warnings: plan.warnings,
     eventCount: plan.events.length,
     noteCount: plan.stats.noteCount,
@@ -386,6 +555,7 @@ export function generateMacroCsv(plan: PlaybackPlan, options: MacroExportOptions
   header.push('# 每一行可直接录入支持「按键/鼠标 + 延时」的鼠标宏编辑器；延时=距上一事件的毫秒数。');
   header.push('# 设备=键盘时按对应音键；设备=鼠标时按住/松开对应修饰键。');
   header.push('# 若编辑器只支持键盘宏，可忽略鼠标行并用键位表手动补修饰键（见触发键位表导出）。');
+  header.push('# 罗技 G HUB 请用「罗技 G HUB Lua」；雷蛇/海盗船/赛睿/血手等宏只能录制，请逐行录入本表，或改用 AHK 脚本（对任意品牌鼠标有效）。');
 
   return {
     format: 'csv',
@@ -412,7 +582,8 @@ export function generateTriggerTable(plan: PlaybackPlan, options: MacroExportOpt
   lines.push(`- 音符：${plan.stats.noteCount} ｜ 输入事件：${plan.events.length} ｜ 总时长：${formatDuration(plan.durationMs)}`);
   lines.push('- 音键：Z X C V B N M , = 1 2 3 4 5 6 7 高音1');
   lines.push('- 鼠标修饰：左键=降八度，右键=升八度，中键=升半音（可组合，如「右键+中键+Z」）');
-  lines.push('- 宏触发建议：鼠标侧键（AHK 可写 `XButton1::StartMacro`；罗技 Lua 改 `TRIGGER_BUTTON`）');
+  lines.push('- 宏触发建议：鼠标侧键（AHK 可写 `XButton1::StartMacro` / `Hotkey "XButton1", StartMacro`；罗技 Lua 改 `TRIGGER_BUTTON`）');
+  lines.push('- 跨品牌说明：宏由宏软件执行，与鼠标品牌无关；只有罗技有脚本引擎，其他品牌请用 AHK 或按本表手工录入（见下方兼容性表）');
   lines.push('');
   lines.push('## 1. 全音域触发键位表（C3–C#6，共 ' + keyRows.length + ' 个半音）');
   lines.push('');
@@ -459,8 +630,18 @@ export function generateTriggerTable(plan: PlaybackPlan, options: MacroExportOpt
   lines.push(`| 鼠标修饰按下 | ${counts.mousedown} |`);
   lines.push(`| 鼠标修饰松开 | ${counts.mouseup} |`);
   lines.push('');
+  lines.push('## 5. 宏软件兼容性');
+  lines.push('');
+  lines.push('| 宏软件 | 适用鼠标 | 导入方式 | 推荐导出 | 说明 |');
+  lines.push('|---|---|---|---|---|');
+  for (const row of MACRO_SOFTWARE_ROWS) {
+    lines.push(
+      `| ${escapeMd(row.software)} | ${escapeMd(row.brand)} | ${MACRO_SUPPORT_LABEL[row.support]} | ${escapeMd(row.format)} | ${escapeMd(row.note)} |`,
+    );
+  }
+  lines.push('');
   if (plan.warnings.length > 0) {
-    lines.push('## 5. 注意');
+    lines.push('## 6. 注意');
     lines.push('');
     for (const warning of plan.warnings) lines.push(`- ${warning}`);
     lines.push('');
@@ -486,6 +667,8 @@ export function generateMacroExport(
   switch (format) {
     case 'ahk':
       return generateAhkMacro(plan, options);
+    case 'ahk2':
+      return generateAhk2Macro(plan, options);
     case 'lua':
       return generateLogitechLuaMacro(plan, options);
     case 'csv':

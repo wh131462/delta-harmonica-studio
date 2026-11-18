@@ -594,6 +594,21 @@ export function planPerformance(score: Score, options: PlanOptions = {}): Playba
   };
 }
 
+/**
+ * 试听定位：从某个拍位开始播放时，计划里应作为起点的音符时间（毫秒）。
+ *
+ * - 拍位落在某个音内部（例如连音被合并后的后半段）→ 从该音的起点开始；
+ * - 拍位落在休止符 / 空档 → 从紧随其后的第一个音开始；
+ * - 后面没有可演奏的音 → -1。
+ */
+export function auditionStartMs(plan: PlaybackPlan, startBeat: number): number {
+  if (!Number.isFinite(startBeat) || plan.notes.length === 0) return -1;
+  for (const note of plan.notes) {
+    if (note.startBeat + note.durationBeats > startBeat + 1e-6) return note.startMs;
+  }
+  return -1;
+}
+
 export interface PlanValidationIssue {
   severity: 'error' | 'warning';
   message: string;
