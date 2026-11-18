@@ -1,12 +1,28 @@
+# 依赖
 node_modules/
+
+# 构建产物：electron-vite 输出到 out/，electron-builder 输出到 release/
 out/
 release/
 dist/
-coverage/
-*.log
-.DS_Store
-Thumbs.db
+
+# 旧版 electron-builder buildResources 目录（图标已迁移到 assets/）
+# 忽略它，避免打包工具留下的 .icon-ico / 缓存再次被误提交
+build/
+
+# 本地产物：截图、探针与验收日志
 artifacts/
 screenshots/
 *.tmp
 .tmp/
+
+# 但 docs/ 下的界面截图需要入库
+!docs/screenshots/
+!docs/screenshots/**
+
+# 工具与系统文件
+coverage/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
