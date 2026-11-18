@@ -1,24 +1,105 @@
 name: Release
 
+# 两条入口：
+#   1. 推 tag（v*）——版本号取自 tag 名；
+#   2. 手动触发（Actions → Release → Run workflow）——可指定版本号，也可留空，
+#      由提交信息规则检索（feat: vX.Y.Z / chore(release): vX.Y.Z）或 package.json 推导。
+# 两条入口都会生成同一份自动描述并创建 GitHub Release。
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号，如 0.4.0 或 v0.4.0。留空则依次尝试：tag 名 → 提交信息规则 feat: vX.Y.Z → package.json'
+        required: false
+        default: ''
+      ref:
+        description: '要构建的 tag / 分支 / commit（留空取当前分支最新提交）'
+        required: false
+        default: ''
+      publish:
+        description: '构建完成后创建 / 更新 GitHub Release'
+        type: boolean
+        default: true
+      prerelease:
+        description: '标记为 Pre-release'
+        type: boolean
+        default: false
 
+# softprops/action-gh-release 需要写 Release 的权限
 permissions:
   contents: write
 
+# 发版不能被打断：同 ref 排队而不是取消
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
-  # 有证书时在仓库 Secrets 配置 CSC_LINK / CSC_KEY_PASSWORD（.p12 的 base64）即可自动签名；
-  # 未配置时 macOS 使用 after-pack 的 ad-hoc 签名，Windows / Linux 保持未签名。
-  CSC_LINK: ${{ secrets.CSC_LINK }}
-  CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+  # 不做代码签名：Windows / Linux 产物未签名，macOS 未做开发者签名与公证
+  # （Apple Silicon 由 scripts/after-pack.cjs 补 ad-hoc 签名，否则系统会判定应用「已损坏」）。
+  # 首次打开的系统拦截由 Release 描述里的「macOS 首次打开放行」一节引导用户处理。
   CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
 jobs:
+  # 先解析版本号并生成发布描述，后面三个平台都用同一份结果，保证包名与描述一致
+  prepare:
+    name: resolve version & notes
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.notes.outputs.version }}
+      tag: ${{ steps.notes.outputs.tag }}
+      previous: ${{ steps.notes.outputs.previous }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 需要完整历史与全部 tag：要按「上一个版本..当前」取提交
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate release notes
+        id: notes
+        env:
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          node scripts/release-notes.mjs \
+            --version "${{ inputs.version }}" \
+            --out release-notes.md
+
+      - name: Check tag matches resolved version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="${{ steps.notes.outputs.version }}"
+          if [ "v$version" != "$tag" ]; then
+            echo "::error::tag 「$tag」与解析出的版本「v$version」不一致；请用 v<语义化版本> 命名 tag，或手动触发并显式填写 version 输入。"
+            exit 1
+          fi
+          echo "tag 与版本一致：$tag"
+
+      - name: Show release notes
+        run: cat release-notes.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
   build:
     name: package (${{ matrix.name }})
+    needs: prepare
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -44,6 +125,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -63,6 +146,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # 版本号以 prepare 解析结果为准，保证 artifactName 里的版本与 Release 一致
+      - name: Apply release version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Typecheck and test
         run: |
@@ -89,8 +176,9 @@ jobs:
 
   publish:
     name: publish GitHub Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [prepare, build]
+    # 推 tag 一定发布；手动触发由 publish 开关决定（默认开启）
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -98,6 +186,14 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+          # 发布说明单独下载，避免被 sha256sum 混进校验清单
+          pattern: delta-harmonica-*
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes
 
       - name: Generate checksums
         run: |
@@ -108,16 +204,12 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
-          generate_release_notes: true
-          append_body: true
-          body: |
-            ## 平台说明
-
-            - **Windows 10 / 11 x64**：完整功能，含向《三角洲行动》注入键鼠（需以管理员身份运行）。
-            - **macOS 12+（Intel / Apple Silicon）**：编辑、导入、练习、试听、宏导出可用；游戏注入不可用，演奏以排练模式运行。
-            - **Linux x64**：同上；Wayland 下悬浮窗的位置与置顶由桌面合成器决定。
-
-            macOS / Linux 包未做代码签名与公证（macOS 已做 ad-hoc 签名），首次打开时可能被系统拦截：
-            macOS 请右键「打开」或在「系统设置 → 隐私与安全性」中允许；Linux AppImage 需要 `chmod +x`。
-            详细构建说明见 `docs/PLATFORM_SUPPORT.md`。
+          # tag 推送时即当前 tag；手动触发时由版本号生成 tag，必要时在该提交上创建
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: 三角洲口琴工坊 ${{ needs.prepare.outputs.tag }}
+          body_path: notes/release-notes.md
+          # 描述已由 scripts/release-notes.mjs 生成（含特性 / 修复表格），不再叠加 GitHub 自动生成的变更列表
+          generate_release_notes: false
+          prerelease: ${{ inputs.prerelease || false }}
+          files: |
+            artifacts/**/*
