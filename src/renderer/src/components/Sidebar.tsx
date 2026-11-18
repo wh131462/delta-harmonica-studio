@@ -1,68 +1,89 @@
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { useAppStore, type PageId } from '@renderer/state/app-store';
 
-const NAV_ITEMS: Array<{ id: PageId; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
-  { id: 'play', label: '演奏台', icon: 'play' },
-  { id: 'editor', label: '简谱编辑器', icon: 'edit' },
+interface NavItem {
+  id: PageId;
+  label: string;
+  icon: IconName;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'play', label: '演奏控制', icon: 'play' },
+  { id: 'practice', label: '跟谱练习', icon: 'keyboard' },
+  { id: 'editor', label: '简谱编辑', icon: 'edit' },
   { id: 'import', label: '智能导入', icon: 'import' },
-  { id: 'library', label: '音乐方案库', icon: 'library' },
-  { id: 'settings', label: '设置与校准', icon: 'settings' },
+  { id: 'library', label: '音乐方案', icon: 'library' },
+  { id: 'settings', label: '设置校准', icon: 'settings' },
 ];
 
+/** 侧边导航：品牌 + 6 个一级入口 + 权限状态。窄窗口收成图标轨。 */
 export function Sidebar(): JSX.Element {
   const app = useAppStore();
   const elevated = app.appInfo?.elevated ?? false;
+  // macOS / Linux 没有 Win32 注入能力：不显示「权限受限」这类误导状态，详细原因在设置页。
+  const canInject = app.appInfo?.capabilities.gameInjection ?? false;
+  const playing = app.playbackStatus.state === 'playing' || app.playbackStatus.state === 'countdown';
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="侧边导航">
       <div className="brand">
-        <div className="brand-mark">
-          <svg width="34" height="34" viewBox="0 0 48 48" aria-hidden="true">
-            <defs>
-              <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#fbbf24" />
-                <stop offset="1" stopColor="#f97316" />
-              </linearGradient>
-            </defs>
-            <rect x="3" y="15" width="42" height="18" rx="5" fill="url(#brandGrad)" opacity="0.16" />
-            <rect x="3" y="15" width="42" height="18" rx="5" stroke="url(#brandGrad)" strokeWidth="2" fill="none" />
-            <path d="M11 17v14M17 17v14M23 17v14M29 17v14M35 17v14M41 17v14" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
-            <rect x="7" y="20" width="34" height="5" fill="url(#brandGrad)" opacity="0.55" />
+        <div className="brand-mark" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 48 48" fill="none">
+            <rect x="5" y="17" width="38" height="14" rx="3.4" stroke="currentColor" strokeWidth="2.6" />
+            <path
+              d="M12.5 20.5v7M19 20.5v7M25.5 20.5v7M32 20.5v7M38.5 20.5v7"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
           </svg>
         </div>
-        <div>
-          <h1>口琴工坊</h1>
-          <p>Delta Harmonica Studio</p>
-        </div>
+        <h1>口琴工坊</h1>
       </div>
 
-      <nav className="nav">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`nav-item ${app.page === item.id ? 'active' : ''}`}
-            onClick={() => app.navigate(item.id)}
-          >
-            <Icon name={item.icon} size={18} />
-            <span>{item.label}</span>
-            {item.id === 'play' && app.playbackStatus.state === 'playing' ? <span className="nav-live">LIVE</span> : null}
-            {item.id === 'editor' && app.dirty ? <span className="nav-dot" title="有未保存修改" /> : null}
-          </button>
-        ))}
+      <nav className="nav" aria-label="主页面">
+        {NAV_ITEMS.map((item) => {
+          const active = app.page === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={`nav-item ${active ? 'active' : ''}`}
+              aria-current={active ? 'page' : undefined}
+              aria-label={item.label}
+              title={item.label}
+              onClick={() => app.navigate(item.id)}
+            >
+              <Icon name={item.icon} size={16} />
+              <span>{item.label}</span>
+              {item.id === 'play' && playing ? (
+                <span className="nav-live" title="正在演奏">
+                  LIVE
+                </span>
+              ) : null}
+              {item.id === 'editor' && app.dirty ? <span className="nav-dot" title="有未保存修改" /> : null}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">
-        <button
-          type="button"
-          className={`permission-chip ${elevated ? 'ok' : 'warn'}`}
-          onClick={() => app.navigate('settings')}
-          title={elevated ? '已以管理员权限运行' : '未以管理员运行，注入游戏可能失败'}
-        >
-          <Icon name="shield" size={15} />
-          <span>{elevated ? '管理员权限' : '权限不足'}</span>
-        </button>
-        <p className="version">v{app.appInfo?.version ?? '0.1.0'} · 仅供个人娱乐</p>
+        {canInject ? (
+          <button
+            type="button"
+            className={`permission-chip ${elevated ? 'ok' : 'warn'}`}
+            onClick={() => app.navigate('settings')}
+            title={
+              elevated
+                ? '已以管理员权限运行（满足向游戏注入按键的要求）'
+                : '未以管理员运行，注入游戏可能被系统拦截；点此进入设置查看处理方式'
+            }
+            aria-label={elevated ? '管理员权限已就绪，打开设置' : '权限不足，打开设置查看处理方式'}
+          >
+            <Icon name={elevated ? 'shield' : 'warning'} size={13} />
+            <span>{elevated ? '管理员权限' : '权限受限'}</span>
+          </button>
+        ) : null}
       </div>
     </aside>
   );

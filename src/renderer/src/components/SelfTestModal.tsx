@@ -16,6 +16,7 @@ const EXPECTED: Array<{ label: string; hint: string }> = [
 export function SelfTestModal(): JSX.Element | null {
   const app = useAppStore();
   const open = app.selfTestOpen;
+  const canInject = app.appInfo?.capabilities.gameInjection ?? true;
   const [running, setRunning] = useState(false);
   const [received, setReceived] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
@@ -41,7 +42,7 @@ export function SelfTestModal(): JSX.Element | null {
   }, []);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || !canInject) return undefined;
     void run();
     const push = (text: string) => {
       // 弹窗打开期间全程记录，便于确认最后一两个事件（如 mouseup）也送达
@@ -73,7 +74,7 @@ export function SelfTestModal(): JSX.Element | null {
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [open, run]);
+  }, [open, canInject, run]);
 
   if (!open) return null;
 
@@ -83,69 +84,95 @@ export function SelfTestModal(): JSX.Element | null {
     received.some((item) => item.startsWith('keydown Comma')) &&
     received.some((item) => item.startsWith('mousedown button=1'));
 
+  const tone = !canInject ? 'warn' : success ? 'ok' : errorText ? 'danger' : finished ? 'warn' : 'signal';
+  const summary = !canInject
+    ? `${app.appInfo?.capabilities.label ?? '当前平台'} 版不向系统注入按键，无法进行输入链路自检`
+    : success
+      ? '注入链路正常：Windows 输入通道与 SendInput 可用'
+      : errorText
+        ? `自检失败：${errorText}`
+        : finished
+          ? '未收到完整的注入事件'
+          : '正在发送测试事件…';
+
   return (
     <Modal
       open={open}
       title="输入通道自检"
-      subtitle="验证 Windows SendInput → 本窗口的按键注入链路"
+      subtitle={
+        canInject
+          ? '验证 Windows SendInput → 本窗口的按键注入链路'
+          : `${app.appInfo?.capabilities.label ?? '当前平台'} 版没有按键注入链路`
+      }
       onClose={() => app.setSelfTestOpen(false)}
       dismissOnOverlay={false}
+      className="selftest-modal"
       footer={
         <>
-          <button type="button" className="button ghost" onClick={() => app.setSelfTestOpen(false)}>
+          <button type="button" className="btn btn--quiet" onClick={() => app.setSelfTestOpen(false)}>
             关闭
           </button>
-          <button type="button" className="button primary" disabled={running} onClick={() => void run()}>
-            {running ? '自检中…' : '重新自检'}
-          </button>
+          {canInject ? (
+            <button
+              type="button"
+              className={`btn btn--primary ${running ? 'btn--loading' : ''}`}
+              disabled={running}
+              onClick={() => void run()}
+            >
+              {running ? '自检中' : '重新自检'}
+            </button>
+          ) : null}
         </>
       }
     >
       <div className="selftest">
-        <div className="selftest-checklist">
-          <p className="section-label">将会依次发送</p>
-          <ol>
-            {EXPECTED.map((item) => (
-              <li key={item.label}>
-                <span>{item.label}</span>
-                <em>{item.hint}</em>
-              </li>
-            ))}
-          </ol>
-          <p className="hint-text">
-            自检开始后本窗口会被自动切到前台；请勿在此期间操作键盘鼠标。自检只验证“按键注入是否生效”，游戏内的权限、键位与时序仍建议进游戏实测。
-          </p>
-        </div>
+        {canInject ? (
+          <div className="selftest-grid">
+            <section>
+            <p className="section-label">将会依次发送</p>
+            <ol className="selftest-steps">
+              {EXPECTED.map((item, index) => (
+                <li key={item.label}>
+                  <span className="selftest-step-index">{index + 1}</span>
+                  <span className="selftest-step-text">
+                    {item.label}
+                    <em>{item.hint}</em>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="field-hint">
+              自检开始后本窗口会被自动切到前台，请勿在此期间操作键盘鼠标。自检只验证「按键注入是否生效」，游戏内的权限、键位与时序仍建议进游戏实测。
+            </p>
+          </section>
 
-        <div className="selftest-received">
-          <p className="section-label">窗口实际收到的事件（{received.length}）</p>
-          <div className="event-log">
-            {received.length === 0 ? (
-              <span className="muted">{running ? '等待注入事件…' : '没有收到任何注入事件'}</span>
-            ) : (
-              received.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)
-            )}
+          <section>
+            <p className="section-label">窗口实际收到的事件（{received.length}）</p>
+            <div className="event-log">
+              {received.length === 0 ? (
+                <span className="muted">{running ? '等待注入事件…' : '没有收到任何注入事件'}</span>
+              ) : (
+                received.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)
+              )}
+            </div>
+          </section>
           </div>
-        </div>
+        ) : (
+          <p className="field-hint">
+            本平台没有按键注入链路，自检不会发送任何事件；编辑、导入、练习、试听与宏导出照常可用。需要验证游戏注入时，请在 Windows 版运行自检。
+          </p>
+        )}
 
-        <div className={`selftest-result ${success ? 'ok' : errorText ? 'error' : finished ? 'warn' : ''}`}>
-          <Icon name={success ? 'check' : 'warning'} size={18} />
-          <div>
-            <strong>
-              {success
-                ? '注入链路正常：Windows 输入通道与 SendInput 可用'
-                : errorText
-                  ? `自检失败：${errorText}`
-                  : finished
-                    ? '未收到完整的注入事件'
-                    : '自检进行中…'}
-            </strong>
+        <div className={`notice notice--${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>
+          <div className="notice__icon" aria-hidden="true">
+            <Icon name={success ? 'check' : tone === 'signal' ? 'activity' : 'warning'} size={15} />
+          </div>
+          <div className="notice__body">
+            <strong className="notice__title">{summary}</strong>
             {!success && finished ? (
-              <ul>
-                <li>确认本程序没有被安全软件拦截（可尝试“以管理员身份运行”）</li>
-                <li>确认自检时没有切换到其他窗口</li>
-                <li>若系统使用远程桌面/虚拟机，模拟输入可能受限</li>
-              </ul>
+              <span className="notice__desc">
+                确认程序没有被安全软件拦截（可尝试「以管理员身份运行」）、自检时没有切到其他窗口；远程桌面 / 虚拟机环境下模拟输入可能受限。
+              </span>
             ) : null}
           </div>
         </div>

@@ -1,6 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * 弹窗基元：Esc 关闭、焦点回到触发元素、Tab 焦点循环、读取 title 作为无障碍名称。
+ */
 export function Modal({
   open,
   title,
@@ -23,18 +29,49 @@ export function Modal({
   dismissOnOverlay?: boolean;
 }): JSX.Element | null {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!open) return undefined;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && closable) onClose?.();
-    };
-    window.addEventListener('keydown', handler);
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panelRef.current?.focus();
-    return () => window.removeEventListener('keydown', handler);
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && closable) {
+        event.stopPropagation();
+        onClose?.();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const nodes = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (node) => node.offsetParent !== null,
+      );
+      if (nodes.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const activeNode = document.activeElement;
+      if (event.shiftKey && (activeNode === first || activeNode === panelRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeNode === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      restoreFocusRef.current?.focus?.();
+    };
   }, [open, closable, onClose]);
 
   if (!open) return null;
+
   return (
     <div
       className="modal-overlay"
@@ -45,10 +82,17 @@ export function Modal({
         if (event.target === event.currentTarget && closable && dismissOnOverlay) onClose?.();
       }}
     >
-      <div className={`modal-panel ${className}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={panelRef}>
+      <div
+        className={`modal-panel ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        ref={panelRef}
+      >
         <header className="modal-header">
           <div>
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
           </div>
           {closable ? (
@@ -71,10 +115,10 @@ export function Toast({
   kind: 'info' | 'success' | 'error' | 'warning';
   text: string;
 }): JSX.Element {
-  const iconName = kind === 'success' ? 'check' : kind === 'error' || kind === 'warning' ? 'warning' : 'sparkle';
+  const iconName = kind === 'success' ? 'check' : kind === 'error' || kind === 'warning' ? 'warning' : 'info';
   return (
-    <div className={`toast toast-${kind}`} role="status">
-      <Icon name={iconName} size={16} />
+    <div className={`toast toast-${kind}`} role="status" aria-live="polite">
+      <Icon name={iconName} size={15} />
       <span>{text}</span>
     </div>
   );
